@@ -3,21 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Samosbor Chat MVP</title>
+    <title>Samosbor Chat Pro</title>
     <style>
         body { font-family: sans-serif; background: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #chat-container { width: 400px; height: 500px; background: #333; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #auth-container, #chat-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); padding: 20px; box-sizing: border-box; }
+        #chat-container { height: 500px; padding: 0; display: none; }
+        .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        input { padding: 10px; border: none; border-radius: 4px; outline: none; background: #444; color: white; }
+        button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #005999; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         .msg { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; }
         .msg.other { background: #444; align-self: flex-start; }
         .msg.me { background: #007acc; align-self: flex-end; }
         #input-area { display: flex; padding: 10px; background: #222; }
-        #message-input { flex: 1; padding: 10px; border: none; border-radius: 4px; outline: none; }
-        #send-btn { background: #007acc; color: white; border: none; padding: 10px 15px; margin-left: 5px; border-radius: 4px; cursor: pointer; }
+        #message-input { flex: 1; }
+        #send-btn { margin-left: 5px; }
+        .error { color: #ff6b6b; font-size: 14px; text-align: center; }
     </style>
 </head>
 <body>
 
+<!-- Экран авторизации -->
+<div id="auth-container">
+    <h2>Вход в Мессенджер</h2>
+    <div class="form-group">
+        <input type="text" id="username" placeholder="Имя пользователя">
+        <input type="password" id="password" placeholder="Пароль">
+    </div>
+    <button id="login-btn">Войти</button>
+    <button id="register-btn" style="background: #444; margin-top: 5px;">Регистрация</button>
+    <p id="auth-error" class="error"></p>
+</div>
+
+<!-- Экран чата -->
 <div id="chat-container">
     <div id="messages"></div>
     <div id="input-area">
@@ -28,43 +47,103 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-    // При деплое замени этот URL на URL твоего бэкенда на Render
-    const socket = io("wss://rotarempy-messenger.hf.space"); 
+    // Ссылки на адреса (замени на свои hf.space адреса)
+    const BACKEND_URL = "https://rotarempy-messenger.hf.space"; 
+    const SOCKET_URL = "wss://rotarempy-messenger.hf.space";
 
-    // Генерируем случайное имя для теста, чтобы отличать свои сообщения от чужих
-    const myName = "User_" + Math.floor(Math.random() * 1000);
+    let currentUser = null;
+    let socket = null;
 
-    const messagesContainer = document.getElementById('messages');
-    const messageInput = document.getElementById('message-input');
-    const sendBtn = document.getElementById('send-btn');
+    const authContainer = document.getElementById('auth-container');
+    const chatContainer = document.getElementById('chat-container');
+    const authError = document.getElementById('auth-error');
 
-    // Функция отправки
-    function sendMessage() {
-        const text = messageInput.value.trim();
-        if (text !== '') {
-            socket.emit('send_message', { sender: myName, text: text });
-            messageInput.value = '';
+    // Функция переключения на экран чата и инициализация сокетов
+    function startChat(username) {
+        currentUser = username;
+        authContainer.style.display = 'none';
+        chatContainer.style.display = 'flex';
+
+        // Подключаем веб-сокеты ПОСЛЕ входа
+        socket = io(SOCKET_URL);
+
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (text !== '') {
+                socket.emit('send_message', { sender: currentUser, text: text });
+                messageInput.value = '';
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+        // Загрузка истории сообщений из БД
+        socket.on('load_history', (messages) => {
+            messagesContainer.innerHTML = '';
+            messages.forEach(msg => appendMessage(msg));
+        });
+
+        // Получение новых сообщений
+        socket.on('receive_message', (data) => {
+            appendMessage(data);
+        });
+
+        function appendMessage(data) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('msg');
+            if (data.sender === currentUser) {
+                messageElement.classList.add('me');
+                messageElement.innerText = data.text;
+            } else {
+                messageElement.classList.add('other');
+                messageElement.innerText = `${data.sender}: ${data.text}`;
+            }
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     }
 
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-
-    // Слушаем сервер и добавляем сообщения на экран
-    socket.on('receive_message', (data) => {
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('msg');
+    // Логика кнопок авторизации
+    document.getElementById('register-btn').addEventListener('click', async () => {
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value;
         
-        if (data.sender === myName) {
-            messageElement.classList.add('me');
-            messageElement.innerText = data.text;
+        const res = await fetch(`${BACKEND_URL}/api/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            authError.style.color = '#6bff6b';
+            authError.innerText = "Успешная регистрация! Теперь войдите.";
         } else {
-            messageElement.classList.add('other');
-            messageElement.innerText = `${data.sender}: ${data.text}`;
+            authError.style.color = '#ff6b6b';
+            authError.innerText = data.error;
         }
+    });
 
-        messagesContainer.appendChild(messageElement);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight; // Скролл вниз
+    document.getElementById('login-btn').addEventListener('click', async () => {
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value;
+        
+        const res = await fetch(`${BACKEND_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            startChat(data.username);
+        } else {
+            authError.style.color = '#ff6b6b';
+            authError.innerText = data.error;
+        }
     });
 </script>
 </body>
