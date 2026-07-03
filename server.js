@@ -2,37 +2,83 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const app = express();
-app.use(cors()); // Разрешаем запросы с других сайтов (нашего фронтенда)
+app.use(cors());
+app.use(express.json()); // Чтобы сервер понимал JSON-запросы
 
 const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-// Настраиваем Socket.io с поддержкой CORS
-const io = new Server(server, {
-    cors: {
-        origin: "*", // В продакшене лучше указать конкретный URL твоего сайта
-        methods: ["GET", "POST"]
+// Подключение к MongoDB
+const MONGODB_URI = process.env.MONGODB_URI;
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('Успешное подключение к MongoDB Atlas'))
+    .catch(err => console.error('Ошибка подключения к БД:', err));
+
+// Схемы данных для БД
+const UserSchema = new mongoose.Schema({
+    username: { type: String, unique: true, required: true },
+    password: { type: String, required: true }
+});
+const User = mongoose.model('User', UserSchema);
+
+const MessageSchema = new mongoose.Schema({
+    sender: String,
+    text: String,
+    timestamp: { type: Date, default: Date.now }
+});
+const Message = mongoose.model('Message', MessageSchema);
+
+// HTTP Эндпоинты для Регистрации и Входа
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+        res.status(201).json({ message: 'Пользователь создан' });
+    } catch (error) {
+        res.status(400).json({ error: 'Имя пользователя уже занято или ошибка данных' });
     }
 });
 
-// Слушаем подключения клиентов
-io.on('connection', (socket) => {
-    console.log('Пользователь подключился:', socket.id);
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+        res.json({ username: user.username });
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
 
-    // Слушаем событие отправки сообщения
-    socket.on('send_message', (data) => {
-        // Пересылаем сообщение ВСЕМ подключенным пользователям
+// Работа с сокетами
+io.on('connection', async (socket) => {
+    console.log('Подключился:', socket.id);
+
+    // При подключении нового юзера отправляем ему последние 50 сообщений из базы
+    try {
+        const recentMessages = await Message.find().sort({ timestamp: -1 }).limit(50);
+        socket.emit('load_history', recentMessages.reverse());
+    } catch (err) {
+        console.error(err);
+    }
+
+    socket.on('send_message', async (data) => {
+        // Сохраняем сообщение в базу данных
+        const newMessage = new Message({ sender: data.sender, text: data.text });
+        await newMessage.save();
+
+        // Рассылаем всем
         io.emit('receive_message', data);
     });
-
-    socket.on('disconnect', () => {
-        console.log('Пользователь отключился:', socket.id);
-    });
 });
 
-// Порт для работы (Render сам назначит порт через process.env.PORT)
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-});
+const PORT = 7860;
+server.listen(PORT, '0.0.0.0', () => console.log(`Сервер запущен на порту ${PORT}`));
