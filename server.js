@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Чтобы сервер понимал JSON-запросы
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
@@ -18,19 +18,19 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('Успешное подключение к MongoDB Atlas'))
     .catch(err => console.error('Ошибка подключения к БД:', err));
 
-// Схемы данных для БД
+// Схемы данных для БД (Ребрендинг под GIGA MESSENGER)
 const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true }
 });
-const User = mongoose.model('User', UserSchema);
+const User = mongoose.model('GigaUser', UserSchema);
 
 const MessageSchema = new mongoose.Schema({
     sender: String,
     text: String,
     timestamp: { type: Date, default: Date.now }
 });
-const Message = mongoose.model('Message', MessageSchema);
+const Message = mongoose.model('GigaMessage', MessageSchema);
 
 // HTTP Эндпоинты для Регистрации и Входа
 app.post('/api/register', async (req, res) => {
@@ -60,9 +60,8 @@ app.post('/api/login', async (req, res) => {
 
 // Работа с сокетами
 io.on('connection', async (socket) => {
-    console.log('Подключился:', socket.id);
+    console.log('Подключился к GIGA чату:', socket.id);
 
-    // При подключении нового юзера отправляем ему последние 50 сообщений из базы
     try {
         const recentMessages = await Message.find().sort({ timestamp: -1 }).limit(50);
         socket.emit('load_history', recentMessages.reverse());
@@ -71,14 +70,11 @@ io.on('connection', async (socket) => {
     }
 
     socket.on('send_message', async (data) => {
-        // Сохраняем сообщение в базу данных
         const newMessage = new Message({ sender: data.sender, text: data.text });
         await newMessage.save();
-
-        // Рассылаем всем
         io.emit('receive_message', data);
     });
 });
 
 const PORT = 7860;
-server.listen(PORT, '0.0.0.0', () => console.log(`Сервер запущен на порту ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`GIGA Сервер успешно запущен на порту ${PORT}`));

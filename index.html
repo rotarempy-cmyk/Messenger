@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Samosbor Chat Pro</title>
+    <title>GIGA MESSENGER</title>
     <style>
         body { font-family: sans-serif; background: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         #auth-container, #chat-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); padding: 20px; box-sizing: border-box; }
@@ -24,9 +24,8 @@
 </head>
 <body>
 
-<!-- Экран авторизации -->
 <div id="auth-container">
-    <h2>Вход в Мессенджер</h2>
+    <h2>Вход в GIGA MESSENGER</h2>
     <div class="form-group">
         <input type="text" id="username" placeholder="Имя пользователя">
         <input type="password" id="password" placeholder="Пароль">
@@ -36,7 +35,6 @@
     <p id="auth-error" class="error"></p>
 </div>
 
-<!-- Экран чата -->
 <div id="chat-container">
     <div id="messages"></div>
     <div id="input-area">
@@ -58,13 +56,11 @@
     const chatContainer = document.getElementById('chat-container');
     const authError = document.getElementById('auth-error');
 
-    // Функция переключения на экран чата и инициализация сокетов
     function startChat(username) {
         currentUser = username;
         authContainer.style.display = 'none';
         chatContainer.style.display = 'flex';
 
-        // Подключаем веб-сокеты ПОСЛЕ входа
         socket = io(SOCKET_URL);
 
         const messagesContainer = document.getElementById('messages');
@@ -82,13 +78,11 @@
         sendBtn.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-        // Загрузка истории сообщений из БД
         socket.on('load_history', (messages) => {
             messagesContainer.innerHTML = '';
             messages.forEach(msg => appendMessage(msg));
         });
 
-        // Получение новых сообщений
         socket.on('receive_message', (data) => {
             appendMessage(data);
         });
@@ -108,7 +102,6 @@
         }
     }
 
-    // Логика кнопок авторизации
     document.getElementById('register-btn').addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
