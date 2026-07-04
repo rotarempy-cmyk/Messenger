@@ -7,11 +7,9 @@
     <style>
         body { font-family: sans-serif; background: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         
-        /* Контейнеры экранов */
         #auth-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         #messenger-container { width: 950px; height: 650px; background: #333; border-radius: 8px; display: none; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
-        /* Общие стили элементов */
         .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
         input { padding: 10px; border: none; border-radius: 4px; outline: none; background: #444; color: white; }
         button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; justify-content: center; align-items: center; min-height: 38px; }
@@ -20,21 +18,17 @@
         .error { color: #ff6b6b; font-size: 14px; text-align: center; margin: 5px 0; }
         .success { color: #6bff6b; font-size: 14px; text-align: center; margin: 5px 0; }
 
-        /* Двухпанельный макет мессенджера */
         #sidebar { width: 320px; background: #2b2b2b; display: flex; flex-direction: column; border-right: 1px solid #444; position: relative; }
         #chat-area { flex: 1; display: flex; flex-direction: column; background: #333; position: relative; }
 
-        /* Профиль сверху сидбара */
         #user-profile { padding: 15px; background: #222; font-weight: bold; border-bottom: 1px solid #444; font-size: 14px; color: #007acc; display: flex; align-items: center; gap: 10px; }
         .my-avatar-mini { width: 32px; height: 32px; border-radius: 50%; background: #444; object-fit: cover; border: 1px solid #007acc; }
 
-        /* Блок поиска */
         #search-box { padding: 10px; display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid #444; background: #262626; }
         .search-row { display: flex; gap: 5px; }
         #search-input { flex: 1; padding: 6px; font-size: 13px; }
         #search-btn { min-height: 30px; padding: 5px 10px; font-size: 13px; }
         
-        /* Блок результата поиска */
         #search-result-panel { background: #333; border-radius: 4px; padding: 8px; display: none; flex-direction: column; gap: 8px; margin-top: 5px; border: 1px solid #555; }
         .search-user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .search-user-info:hover span { text-decoration: underline; }
@@ -45,62 +39,51 @@
         .add-friend-btn:hover { background: #218838; }
         .chat-now-btn { background: #007acc; }
 
-        /* Вкладки (Навигация в сидбаре) */
         #tabs { display: flex; background: #222; border-bottom: 1px solid #444; }
         .tab-btn { flex: 1; background: none; border: none; padding: 10px 0; color: #aaa; cursor: pointer; border-bottom: 2px solid transparent; border-radius: 0; min-height: auto; font-size: 13px; text-align: center; display: block; }
         .tab-btn:hover { background: #2a2a2a; color: #fff; }
         .tab-btn.active { color: #007acc; border-bottom: 2px solid #007acc; font-weight: bold; }
         .badge { background: #ff3b30; color: white; border-radius: 10px; padding: 1px 6px; font-size: 10px; margin-left: 3px; font-weight: bold; display: none; }
 
-        /* Контент списков */
         #list-content { flex: 1; overflow-y: auto; margin-bottom: 50px; }
         
-        /* Аватарки в списках */
         .avatar-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #555; }
         .list-item { padding: 10px 15px; border-bottom: 1px solid #3c3c3c; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .list-item:hover { background: #383838; }
         .list-item.active { background: #007acc; color: white; }
         .item-left { display: flex; align-items: center; gap: 10px; flex: 1; }
 
-        /* Кнопка настроек внизу сидбара */
         #sidebar-footer { position: absolute; bottom: 0; left: 0; right: 0; height: 50px; background: #222; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 15px; justify-content: flex-end; }
         .settings-trigger { background: none; border: none; padding: 5px; color: #aaa; font-size: 20px; min-height: auto; display: flex; align-items: center; justify-content: center; }
         .settings-trigger:hover { color: #fff; background: none; }
 
-        /* Окно чата (Справа) */
         #chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #777; font-size: 16px; }
         #chat-main { flex: 1; display: none; flex-direction: column; height: 100%; }
         #chat-header { padding: 15px; background: #2b2b2b; font-weight: bold; border-bottom: 1px solid #444; display: flex; align-items: center; gap: 10px; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
-        /* Сообщения */
         .msg { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; }
         .msg.other { background: #444; align-self: flex-start; }
         .msg.me { background: #007acc; align-self: flex-end; }
         .msg-author { font-size: 11px; color: #aaa; margin-bottom: 3px; display: block; }
         .msg.me .msg-author { color: #bce2ff; }
 
-        /* Область ввода сообщения */
         #input-area { display: flex; padding: 15px; background: #222; gap: 10px; }
         #message-input { flex: 1; }
 
-        /* МОДАЛЬНЫЕ ОКНА (Профиль и Настройки) */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #333; padding: 25px; border-radius: 8px; width: 350px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; }
         .close-modal { position: absolute; top: 10px; right: 15px; font-size: 20px; color: #aaa; cursor: pointer; font-weight: bold; }
         .close-modal:hover { color: #fff; }
         
-        /* Профиль в модалке */
         .profile-avatar-big { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #007acc; margin-bottom: 15px; background: #555; }
         .profile-name { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
         .modal-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; }
         .modal-actions button { width: 100%; }
 
-        /* Настройки в модалке */
         .settings-section { width: 100%; margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
         .settings-section h4 { margin: 5px 0; color: #007acc; border-bottom: 1px solid #444; padding-bottom: 3px; }
 
-        /* Спиннер загрузки */
         .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -193,8 +176,8 @@
         
         <div class="settings-section">
             <h4>Сменить аватарку</h4>
-            <input type="text" id="settings-avatar-url" placeholder="Вставьте ссылку на картинку (URL)">
-            <button id="save-avatar-btn" style="margin-top:5px; height:32px; min-height:auto;"><span class="btn-text">Обновить аватарку</span></button>
+            <input type="file" id="settings-avatar-file" accept="image/*" style="background: none; padding: 5px 0;">
+            <button id="save-avatar-btn" style="margin-top:5px; height:32px; min-height:auto;"><span class="btn-text">Загрузить картинку</span></button>
             <p id="settings-avatar-msg" style="font-size:12px; margin:2px 0;" class="success"></p>
         </div>
 
@@ -219,7 +202,6 @@
     let socket = null;
     let currentTab = 'chats';
 
-    // Элементы UI
     const authContainer = document.getElementById('auth-container');
     const messengerContainer = document.getElementById('messenger-container');
     const authError = document.getElementById('auth-error');
@@ -236,7 +218,6 @@
     const messageInput = document.getElementById('message-input');
     const requestsCountBadge = document.getElementById('requests-count');
 
-    // Модалки элементы
     const profileModal = document.getElementById('profile-modal');
     const modalProfileAvatar = document.getElementById('modal-profile-avatar');
     const modalProfileName = document.getElementById('modal-profile-name');
@@ -329,10 +310,8 @@
     document.getElementById('tab-friends').addEventListener('click', () => switchTab('friends'));
     document.getElementById('tab-requests').addEventListener('click', () => switchTab('requests'));
 
-    // ОТКРЫТИЕ МОДАЛКИ ПРОФИЛЯ С ПРОВЕРКОЙ ОТНОШЕНИЙ
     async function showUserProfile(targetUsername) {
         try {
-            // Запрашиваем инфу профиля
             const profRes = await fetch(`${BACKEND_URL}/api/user/profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -341,7 +320,6 @@
             const profData = await profRes.json();
             if(!profRes.ok) return;
 
-            // Запрашиваем статус дружбы
             const relRes = await fetch(`${BACKEND_URL}/api/user/relationship`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -349,18 +327,15 @@
             });
             const relData = await relRes.json();
 
-            // Заполняем модалку
             modalProfileName.innerText = profData.username;
             modalProfileAvatar.src = profData.avatarUrl;
             profileModal.style.display = 'flex';
 
-            // Настройка кнопки чата в модалке
             modalProfileChatBtn.onclick = () => {
                 profileModal.style.display = 'none';
                 startChatWithUser(profData.username);
             };
 
-            // Настройка кнопки дружбы в зависимости от статуса
             modalProfileFriendBtn.disabled = false;
             modalProfileFriendBtn.style.background = '#28a745';
 
@@ -376,19 +351,18 @@
                 modalProfileFriendBtn.innerText = 'Принять заявку';
                 modalProfileFriendBtn.onclick = async () => {
                     await respondFriendRequest(relData.requestId, 'accept');
-                    showUserProfile(targetUsername); // Обновляем модалку
+                    showUserProfile(targetUsername);
                 };
             } else {
                 modalProfileFriendBtn.innerText = 'Добавить в друзья';
                 modalProfileFriendBtn.onclick = async () => {
                     await sendFriendRequest(profData.username);
-                    showUserProfile(targetUsername); // Обновляем модалку
+                    showUserProfile(targetUsername);
                 };
             }
         } catch(e) {}
     }
 
-    // Хелпер отправки заявки
     async function sendFriendRequest(target) {
         try {
             await fetch(`${BACKEND_URL}/api/friends/request`, {
@@ -399,7 +373,7 @@
         } catch(e){}
     }
 
-    // ОБНОВЛЕННАЯ СВЕРХБЫСТРАЯ ФУНКЦИЯ ОТРИСОВКИ ЧАТОВ
+    // БЫСТРАЯ ОТРИСОВКА ЧАТОВ БЕЗ МЕРЦАНИЯ И ЛАГОВ
     async function loadMyChats() {
         if(currentTab !== 'chats') return;
         try {
@@ -408,41 +382,40 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ myUsername: currentUser })
             });
+            if(!res.ok) return;
             const chats = await res.json();
             
-            if(chats.length === 0) {
+            if(!chats || !Array.isArray(chats) || chats.length === 0) {
                 listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
                 return;
             }
 
-            // Генерируем HTML-строку для сравнения с текущим состоянием
             let newHTML = '';
             chats.forEach(chat => {
+                const name = chat.targetUser || "Неизвестный";
+                const avatar = chat.avatarUrl || "https://api.dicebear.com/7.x/identicon/svg";
                 const isActive = chat._id === activeChatId ? 'active' : '';
+                
                 newHTML += `
-                    <div class="list-item ${isActive}" data-chat-id="${chat._id}" data-target-user="${chat.targetUser}" data-avatar="${chat.avatarUrl}">
+                    <div class="list-item ${isActive}" data-chat-id="${chat._id}" data-target-user="${name}" data-avatar="${avatar}">
                         <div class="item-left">
-                            <img src="${chat.avatarUrl}" class="avatar-mini" alt="">
-                            <span>${chat.targetUser}</span>
+                            <img src="${avatar}" class="avatar-mini" alt="">
+                            <span>${name}</span>
                         </div>
                     </div>
                 `;
             });
 
-            // ПРОВЕРКА: если контент не поменялся — не трогаем DOM. Это убирает лаги и мерцание!
             if (listContent.innerHTML === newHTML) return;
-
             listContent.innerHTML = newHTML;
 
-            // Навешиваем обработчики событий на новые элементы
             listContent.querySelectorAll('.list-item').forEach(item => {
                 const chatId = item.getAttribute('data-chat-id');
                 const targetUser = item.getAttribute('data-target-user');
                 const avatarUrl = item.getAttribute('data-avatar');
                 item.addEventListener('click', () => openChat(chatId, targetUser, avatarUrl));
             });
-
-        } catch (err) { console.error("Ошибка при быстром обновлении чатов:", err); }
+        } catch (err) { console.error(err); }
     }
 
     async function startChatWithUser(targetUser) {
@@ -484,7 +457,6 @@
         socket.emit('join_chat', { chatId: chatId });
     }
 
-    // 2. ОТРИСОВКА ДРУЗЕЙ
     async function loadFriendsList() {
         if(currentTab !== 'friends') return;
         try {
@@ -495,36 +467,38 @@
             });
             const friends = await res.json();
 
-            listContent.innerHTML = '';
+            let newHTML = '';
             if(friends.length === 0) {
                 listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Список друзей пока пуст</div>';
                 return;
             }
 
             friends.forEach(friend => {
-                const item = document.createElement('div');
-                item.classList.add('list-item');
-                item.innerHTML = `
-                    <div class="item-left">
-                        <img src="${friend.avatarUrl}" class="avatar-mini" alt="">
-                        <span>${friend.username}</span>
+                newHTML += `
+                    <div class="list-item" data-username="${friend.username}">
+                        <div class="item-left">
+                            <img src="${friend.avatarUrl}" class="avatar-mini" alt="">
+                            <span>${friend.username}</span>
+                        </div>
+                        <button class="action-btn accept-btn" style="min-height:26px; font-size:11px;">Написать</button>
                     </div>
-                    <button class="action-btn accept-btn" style="min-height:26px; font-size:11px;">Написать</button>
                 `;
-                
-                // Клик по элементу открывает его карточку профиля
-                item.addEventListener('click', () => showUserProfile(friend.username));
-                
+            });
+
+            if(listContent.innerHTML === newHTML) return;
+            listContent.innerHTML = newHTML;
+
+            listContent.querySelectorAll('.list-item').forEach(item => {
+                const name = item.getAttribute('data-username');
+                item.addEventListener('click', () => showUserProfile(name));
                 item.querySelector('button').addEventListener('click', (e) => {
-                    e.stopPropagation(); // Чтобы не открывался профиль при клике на кнопку чата
-                    startChatWithUser(friend.username);
+                    e.stopPropagation();
+                    startChatWithUser(name);
                 });
-                listContent.appendChild(item);
             });
         } catch(e){}
     }
 
-    // 3. ОТРИСОВКА ЗАЯВОК
     async function loadIncomingRequests() {
         if(currentTab !== 'requests') return;
         try {
@@ -535,12 +509,12 @@
             });
             const requests = await res.json();
 
-            listContent.innerHTML = '';
             if(requests.length === 0) {
                 listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Нет входящих заявок</div>';
                 return;
             }
 
+            listContent.innerHTML = '';
             requests.forEach(req => {
                 const item = document.createElement('div');
                 item.classList.add('list-item');
@@ -577,7 +551,6 @@
         } catch(e){}
     }
 
-    // ПОИСК ПОЛЬЗОВАТЕЛЕЙ
     document.getElementById('search-btn').addEventListener('click', async () => {
         const targetInput = document.getElementById('search-input');
         const targetUsername = targetInput.value.trim();
@@ -607,17 +580,14 @@
             searchResultAvatar.src = searchData.avatarUrl;
             searchResultPanel.style.display = 'flex';
 
-            // Клик по плашке поиска открывает модалку профиля
             document.getElementById('search-profile-trigger').onclick = () => showUserProfile(searchData.username);
-
         } catch (err) {
             searchError.innerText = "Ошибка сети при поиске";
-        } finally {
+        } format {
             toggleLoading(document.getElementById('search-btn'), false);
         }
     });
 
-    // Действия кнопок поиска
     searchChatBtn.addEventListener('click', async () => {
         const targetUsername = searchResultName.innerText;
         toggleLoading(searchChatBtn, true);
@@ -652,37 +622,60 @@
         finally { toggleLoading(addFriendActionBtn, false); }
     });
 
-    // ЛОГИКА НАСТРОЕК (ОБНОВЛЕНИЕ ДАННЫХ)
     document.getElementById('open-settings-btn').addEventListener('click', () => {
-        document.getElementById('settings-avatar-url').value = currentUserAvatar;
+        document.getElementById('settings-avatar-file').value = "";
         document.getElementById('settings-avatar-msg').innerText = "";
         document.getElementById('settings-password-msg').innerText = "";
         settingsModal.style.display = 'flex';
     });
 
+    // ЗАГРУЗКА И КАРТИНКИ ЧЕРЕЗ FILE READER В BASE64
     document.getElementById('save-avatar-btn').addEventListener('click', async () => {
-        const urlInput = document.getElementById('settings-avatar-url').value.trim();
+        const fileInput = document.getElementById('settings-avatar-file');
+        const file = fileInput.files[0];
         const msg = document.getElementById('settings-avatar-msg');
         msg.innerText = "";
-        if(!urlInput) return;
+
+        if(!file) {
+            msg.className = "error";
+            msg.innerText = "Выберите файл для загрузки!";
+            return;
+        }
+
+        // Ограничиваем вес файла на клиенте (до 3 МБ), чтобы не забивать базу данных Atlas
+        if (file.size > 3 * 1024 * 1024) {
+            msg.className = "error";
+            msg.innerText = "Файл слишком большой. Максимум 3 МБ.";
+            return;
+        }
 
         toggleLoading(document.getElementById('save-avatar-btn'), true);
-        try {
-            const res = await fetch(`${BACKEND_URL}/api/settings/update-avatar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUser, avatarUrl: urlInput })
-            });
-            const data = await res.json();
-            if(res.ok) {
-                currentUserAvatar = data.avatarUrl;
-                document.getElementById('my-avatar-img').src = currentUserAvatar;
-                msg.className = "success";
-                msg.innerText = "Аватарка успешно обновлена!";
-                if(currentTab === 'chats') loadMyChats();
-            }
-        } catch(e) { msg.className="error"; msg.innerText = "Ошибка обновления"; }
-        finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = async () => {
+            const base64data = reader.result;
+
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/settings/update-avatar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, avatarUrl: base64data })
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    currentUserAvatar = data.avatarUrl;
+                    document.getElementById('my-avatar-img').src = currentUserAvatar;
+                    msg.className = "success";
+                    msg.innerText = "Аватарка успешно обновлена!";
+                    if(currentTab === 'chats') loadMyChats();
+                } else {
+                    msg.className = "error";
+                    msg.innerText = data.error;
+                }
+            } catch(e) { msg.className="error"; msg.innerText = "Ошибка обновления"; }
+            finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
+        };
     });
 
     document.getElementById('save-password-btn').addEventListener('click', async () => {
@@ -713,7 +706,6 @@
         finally { toggleLoading(document.getElementById('save-password-btn'), false); }
     });
 
-    // Закрытие модалок
     document.getElementById('close-profile-modal').onclick = () => profileModal.style.display = 'none';
     document.getElementById('close-settings-modal').onclick = () => settingsModal.style.display = 'none';
     window.onclick = (e) => {
@@ -721,7 +713,6 @@
         if(e.target === settingsModal) settingsModal.style.display = 'none';
     };
 
-    // Отправка сообщений
     function sendMessage() {
         const text = messageInput.value.trim();
         if (text !== '' && activeChatId && currentUser) {
@@ -742,7 +733,6 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    // Авторизация
     document.getElementById('register-btn').addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
