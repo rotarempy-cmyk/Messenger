@@ -373,7 +373,6 @@
         } catch(e){}
     }
 
-    // БЫСТРАЯ ОТРИСОВКА ЧАТОВ БЕЗ МЕРЦАНИЯ И ЛАГОВ
     async function loadMyChats() {
         if(currentTab !== 'chats') return;
         try {
@@ -583,7 +582,7 @@
             document.getElementById('search-profile-trigger').onclick = () => showUserProfile(searchData.username);
         } catch (err) {
             searchError.innerText = "Ошибка сети при поиске";
-        } format {
+        } finally {
             toggleLoading(document.getElementById('search-btn'), false);
         }
     });
@@ -629,7 +628,6 @@
         settingsModal.style.display = 'flex';
     });
 
-    // ЗАГРУЗКА И КАРТИНКИ ЧЕРЕЗ FILE READER В BASE64
     document.getElementById('save-avatar-btn').addEventListener('click', async () => {
         const fileInput = document.getElementById('settings-avatar-file');
         const file = fileInput.files[0];
@@ -642,7 +640,6 @@
             return;
         }
 
-        // Ограничиваем вес файла на клиенте (до 3 МБ), чтобы не забивать базу данных Atlas
         if (file.size > 3 * 1024 * 1024) {
             msg.className = "error";
             msg.innerText = "Файл слишком большой. Максимум 3 МБ.";
