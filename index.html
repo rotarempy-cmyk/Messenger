@@ -32,10 +32,13 @@
         #search-btn { min-height: 30px; padding: 5px 10px; font-size: 13px; }
         
         /* Блок результата поиска */
-        #search-result-panel { background: #333; border-radius: 4px; padding: 8px; display: none; justify-content: space-between; align-items: center; margin-top: 5px; border: 1px solid #555; }
-        #search-result-name { font-size: 13px; font-weight: bold; }
-        .add-friend-btn { min-height: 26px; padding: 2px 8px; font-size: 12px; background: #28a745; }
+        #search-result-panel { background: #333; border-radius: 4px; padding: 8px; display: none; flex-direction: column; gap: 8px; margin-top: 5px; border: 1px solid #555; }
+        #search-result-name { font-size: 13px; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; }
+        .search-actions { display: flex; gap: 5px; }
+        .search-actions button { flex: 1; min-height: 28px; padding: 2px 5px; font-size: 12px; }
+        .add-friend-btn { background: #28a745; }
         .add-friend-btn:hover { background: #218838; }
+        .chat-now-btn { background: #007acc; }
 
         /* Вкладки (Навигация в сидбаре) */
         #tabs { display: flex; background: #222; border-bottom: 1px solid #444; }
@@ -108,7 +111,10 @@
             
             <div id="search-result-panel">
                 <span id="search-result-name">User</span>
-                <button class="add-friend-btn" id="add-friend-action-btn"><span class="btn-text">+ В друзья</span></button>
+                <div class="search-actions">
+                    <button class="chat-now-btn" id="search-chat-btn"><span class="btn-text">Написать</span></button>
+                    <button class="add-friend-btn" id="add-friend-action-btn"><span class="btn-text">+ В друзья</span></button>
+                </div>
             </div>
         </div>
 
@@ -143,7 +149,7 @@
     let currentUser = null;
     let activeChatId = null;
     let socket = null;
-    let currentTab = 'chats'; // Может быть 'chats', 'friends', 'requests'
+    let currentTab = 'chats';
 
     // Элементы
     const authContainer = document.getElementById('auth-container');
@@ -153,6 +159,7 @@
     const searchResultPanel = document.getElementById('search-result-panel');
     const searchResultName = document.getElementById('search-result-name');
     const addFriendActionBtn = document.getElementById('add-friend-action-btn');
+    const searchChatBtn = document.getElementById('search-chat-btn');
     const listContent = document.getElementById('list-content');
     const chatPlaceholder = document.getElementById('chat-placeholder');
     const chatMain = document.getElementById('chat-main');
@@ -195,7 +202,6 @@
             }
         });
 
-        // Запуск периодического обновления списков раз в 5 секунд (для проверки заявок в друзья)
         switchTab('chats');
         startUpdateLoop();
     }
@@ -205,11 +211,11 @@
             updateBadges();
             if(currentTab === 'requests') loadIncomingRequests();
             if(currentTab === 'friends') loadFriendsList();
+            if(currentTab === 'chats') loadMyChats(); // Также обновляем список чатов в фоне
         }, 5000);
         updateBadges();
     }
 
-    // Обновление красного кружка с количеством входящих заявок
     async function updateBadges() {
         try {
             const res = await fetch(`${BACKEND_URL}/api/friends/requests/incoming`, {
@@ -227,7 +233,6 @@
         } catch(e){}
     }
 
-    // Логика переключения табов
     function switchTab(tabName) {
         currentTab = tabName;
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -244,7 +249,7 @@
     document.getElementById('tab-friends').addEventListener('click', () => switchTab('friends'));
     document.getElementById('tab-requests').addEventListener('click', () => switchTab('requests'));
 
-    // 1. ЗАГРУЗКА И ОТРИСОВКА ЧАТОВ
+    // 1. ЧАТЫ
     async function loadMyChats() {
         if(currentTab !== 'chats') return;
         try {
@@ -273,7 +278,6 @@
         } catch (err) { console.error(err); }
     }
 
-    // Создание или открытие чата с пользователем (работает при клике на друга)
     async function startChatWithUser(targetUser) {
         try {
             const res = await fetch(`${BACKEND_URL}/api/chats`, {
@@ -301,7 +305,7 @@
         socket.emit('join_chat', { chatId: chatId });
     }
 
-    // 2. ЗАГРУЗКА И ОТРИСОВКА ДРУЗЕЙ
+    // 2. ДРУЗЬЯ
     async function loadFriendsList() {
         if(currentTab !== 'friends') return;
         try {
@@ -331,7 +335,7 @@
         } catch(e){}
     }
 
-    // 3. ЗАГРУЗКА И ОТРИСОВКА ЗАЯВОК
+    // 3. ЗАЯВКИ
     async function loadIncomingRequests() {
         if(currentTab !== 'requests') return;
         try {
@@ -409,7 +413,6 @@
                 return;
             }
 
-            // Показываем плашку результата
             searchResultName.innerText = searchData.username;
             searchResultPanel.style.display = 'flex';
 
@@ -420,7 +423,19 @@
         }
     });
 
-    // КЛИК ПО КНОПКЕ "ДОБАВИТЬ В ДРУЗЬЯ" В ПОИСКЕ
+    // КЛИК НА КНОПКУ "НАПИСАТЬ" В ПОИСКЕ (Новая фича!)
+    searchChatBtn.addEventListener('click', async () => {
+        const targetUsername = searchResultName.innerText;
+        toggleLoading(searchChatBtn, true);
+        
+        await startChatWithUser(targetUsername);
+        
+        toggleLoading(searchChatBtn, false);
+        searchResultPanel.style.display = 'none';
+        document.getElementById('search-input').value = "";
+    });
+
+    // КЛИК НА КНОПКУ "ДОБАВИТЬ В ДРУЗЬЯ" В ПОИСКЕ
     addFriendActionBtn.addEventListener('click', async () => {
         const targetUsername = searchResultName.innerText;
         toggleLoading(addFriendActionBtn, true);
