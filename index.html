@@ -399,7 +399,7 @@
         } catch(e){}
     }
 
-    // 1. ОТРИСОВКА ЧАТОВ
+    // ОБНОВЛЕННАЯ СВЕРХБЫСТРАЯ ФУНКЦИЯ ОТРИСОВКИ ЧАТОВ
     async function loadMyChats() {
         if(currentTab !== 'chats') return;
         try {
@@ -410,38 +410,39 @@
             });
             const chats = await res.json();
             
-            listContent.innerHTML = '';
             if(chats.length === 0) {
                 listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
                 return;
             }
 
-            for(const chat of chats) {
-                const targetUser = chat.participants.find(p => p !== currentUser) || currentUser;
-                
-                // Чтобы вытянуть аватарку собеседника, берем данные из профиля
-                const pRes = await fetch(`${BACKEND_URL}/api/user/profile`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: targetUser })
-                });
-                const pData = await pRes.json();
-
-                const item = document.createElement('div');
-                item.classList.add('list-item');
-                if (chat._id === activeChatId) item.classList.add('active');
-                
-                item.innerHTML = `
-                    <div class="item-left">
-                        <img src="${pData.avatarUrl}" class="avatar-mini" alt="">
-                        <span>${targetUser}</span>
+            // Генерируем HTML-строку для сравнения с текущим состоянием
+            let newHTML = '';
+            chats.forEach(chat => {
+                const isActive = chat._id === activeChatId ? 'active' : '';
+                newHTML += `
+                    <div class="list-item ${isActive}" data-chat-id="${chat._id}" data-target-user="${chat.targetUser}" data-avatar="${chat.avatarUrl}">
+                        <div class="item-left">
+                            <img src="${chat.avatarUrl}" class="avatar-mini" alt="">
+                            <span>${chat.targetUser}</span>
+                        </div>
                     </div>
                 `;
+            });
 
-                item.addEventListener('click', () => openChat(chat._id, targetUser, pData.avatarUrl));
-                listContent.appendChild(item);
-            }
-        } catch (err) { console.error(err); }
+            // ПРОВЕРКА: если контент не поменялся — не трогаем DOM. Это убирает лаги и мерцание!
+            if (listContent.innerHTML === newHTML) return;
+
+            listContent.innerHTML = newHTML;
+
+            // Навешиваем обработчики событий на новые элементы
+            listContent.querySelectorAll('.list-item').forEach(item => {
+                const chatId = item.getAttribute('data-chat-id');
+                const targetUser = item.getAttribute('data-target-user');
+                const avatarUrl = item.getAttribute('data-avatar');
+                item.addEventListener('click', () => openChat(chatId, targetUser, avatarUrl));
+            });
+
+        } catch (err) { console.error("Ошибка при быстром обновлении чатов:", err); }
     }
 
     async function startChatWithUser(targetUser) {
