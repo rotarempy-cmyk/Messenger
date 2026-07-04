@@ -4,102 +4,251 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GIGA MESSENGER</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #0a0a0a; color: #e0e0e0; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        
-        /* Авторизация */
-        #auth-container { display: none; flex-direction: column; width: 320px; background: #111; padding: 25px; border: 1px solid #222; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
-        .auth-title { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 20px; letter-spacing: 1px; color: #fff; text-transform: uppercase; }
-        .input-field { width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #333; color: #fff; margin-bottom: 15px; font-size: 14px; }
-        .input-field:focus { border-color: #555; outline: none; }
-        .auth-btn { width: 100%; padding: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 13px; text-transform: uppercase; margin-bottom: 10px; }
-        #login-btn { background: #fff; color: #000; }
-        #register-btn { background: #222; color: #aaa; border: 1px solid #333; }
-        #auth-error { font-size: 12px; color: #ff6b6b; text-align: center; margin-top: 5px; min-height: 18px; }
+        :root {
+            /* Тема по умолчанию (Аврора) — переопределяется JS при загрузке */
+            --bg: #0f1117;
+            --surface: #171a23;
+            --surface-2: #1d212c;
+            --surface-hover: #232735;
+            --surface-active: #262b45;
+            --border: #2a2e3d;
+            --text: #e8e9f2;
+            --text-secondary: rgba(232, 233, 242, 0.64);
+            --text-muted: rgba(232, 233, 242, 0.42);
+            --accent: #7c5cff;
+            --accent-hover: #6b4bef;
+            --accent-text: #ffffff;
+            --msg-me-bg: #7c5cff;
+            --msg-me-text: #ffffff;
+            --msg-other-bg: #1d212c;
+            --msg-other-text: #e8e9f2;
+            --danger: #f0454f;
+            --success: #33c17a;
+            --scrollbar-thumb: #2e3345;
+        }
 
-        /* Основной интерфейс */
-        #messenger-container { display: none; width: 100vw; height: 100vh; background: #0c0c0c; }
-        
-        /* Левая панель */
-        .sidebar { width: 320px; height: 100%; background: #111; border-right: 1px solid #222; display: flex; flex-direction: column; flex-shrink: 0; }
-        .profile-bar { padding: 15px; background: #161616; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: space-between; }
-        .profile-info { display: flex; align-items: center; gap: 10px; }
-        .avatar-main { width: 36px; height: 36px; border-radius: 0; object-fit: cover; background: #333; }
-        #my-name { font-weight: bold; font-size: 14px; color: #fff; }
-        .gear-btn { background: none; border: none; color: #888; cursor: pointer; font-size: 18px; }
-        .gear-btn:hover { color: #fff; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        html, body { height: 100%; }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            transition: background-color .25s ease, color .25s ease;
+        }
 
-        /* Поиск и создание групп */
-        .search-bar-container { padding: 10px; background: #131313; border-bottom: 1px solid #222; display: flex; flex-direction: column; gap: 8px; }
-        .search-row { display: flex; gap: 5px; }
-        #search-input { flex: 1; padding: 6px 10px; background: #1a1a1a; border: 1px solid #2a2a2a; color: #fff; font-size: 13px; }
-        .action-btn { padding: 6px 12px; font-size: 12px; font-weight: bold; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 30px; }
-        .accept-btn { background: #28a745; color: #fff; }
-        .reject-btn { background: #dc3545; color: #fff; }
-        
-        .search-result-panel { display: none; background: #1a1a1a; border: 1px solid #333; padding: 8px; align-items: center; justify-content: space-between; }
-        .search-result-left { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .avatar-mini { width: 28px; height: 28px; object-fit: cover; }
-        
-        /* Вкладки */
-        .tabs-container { display: flex; background: #151515; border-bottom: 1px solid #222; }
-        .tab-btn { flex: 1; padding: 10px; background: none; border: none; color: #777; font-size: 12px; font-weight: bold; text-transform: uppercase; cursor: pointer; position: relative; }
-        .tab-btn.active { color: #fff; background: #1a1a1a; }
-        .badge { position: absolute; top: 4px; right: 4px; background: #ff3b30; color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 10px; display: none; }
+        ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
-        /* Списки */
-        .list-content { flex: 1; overflow-y: auto; }
-        .list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #161616; cursor: pointer; transition: background 0.2s; }
-        .list-item:hover { background: #161616; }
-        .list-item.active { background: #1e1e1e; border-left: 3px solid #fff; }
-        .item-left { display: flex; align-items: center; gap: 10px; }
-        .actions-group { display: flex; gap: 5px; }
+        /* Скроллбар */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-        /* Правая панель чата */
-        .chat-area { flex: 1; height: 100%; display: flex; flex-direction: column; background: #080808; }
-        .chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #444; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-        .chat-main { display: none; flex-direction: column; flex: 1; height: 100%; }
-        
-        .chat-header { padding: 15px; background: #111; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: space-between; }
-        .chat-header-left { display: flex; align-items: center; gap: 10px; }
-        #chat-target-name { font-weight: bold; color: #fff; }
-
-        .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #090909; }
-        .msg { max-width: 60%; padding: 10px 14px; font-size: 14px; line-height: 1.5; word-wrap: break-word; display: flex; flex-direction: column; }
-        .msg.me { background: #222; color: #fff; align-self: flex-end; border-left: 2px solid #aaa; }
-        .msg.other { background: #141414; color: #ccc; align-self: flex-start; border-left: 2px solid #444; }
-        .msg-author { font-size: 11px; font-weight: bold; color: #888; margin-bottom: 3px; }
-
-        .input-bar { padding: 15px; background: #111; border-top: 1px solid #222; display: flex; gap: 10px; }
-        #message-input { flex: 1; padding: 10px; background: #181818; border: 1px solid #2a2a2a; color: #fff; font-size: 14px; }
-        #message-input:focus { outline: none; border-color: #444; }
-        #send-btn { background: #fff; color: #000; padding: 0 20px; font-weight: bold; border: none; cursor: pointer; }
-
-        /* Модальные окна */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #111; border: 1px solid #333; width: 360px; padding: 20px; display: flex; flex-direction: column; max-height: 90vh; overflow-y: auto; }
-        .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; color: #fff; }
-        .modal-close-btn { background: #222; color: #fff; border: 1px solid #333; padding: 8px; margin-top: 15px; cursor: pointer; font-weight: bold; text-align: center; }
-
-        .settings-section { margin-bottom: 15px; }
-        .settings-label { font-size: 12px; color: #888; margin-bottom: 5px; display: block; }
-        
-        /* Крутилка загрузки */
-        .spinner { width: 16px; height: 16px; border: 2px solid rgba(25px,25px,25px,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes fadeScaleIn { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Авторизация */
+        #auth-container {
+            display: none; flex-direction: column; width: 380px;
+            background: var(--surface); padding: 40px 34px; border-radius: 22px;
+            border: 1px solid var(--border);
+            box-shadow: 0 30px 70px rgba(0,0,0,0.5);
+            animation: fadeScaleIn .25s ease;
+        }
+        .auth-title {
+            font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 28px;
+            letter-spacing: 0.3px; color: var(--text);
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .input-field {
+            width: 100%; padding: 13px 15px; background: var(--bg);
+            border: 1.5px solid var(--border); border-radius: 12px; color: var(--text);
+            margin-bottom: 14px; font-size: 14px; transition: border-color .15s, box-shadow .15s;
+        }
+        .input-field::placeholder { color: var(--text-muted); }
+        .input-field:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+        .auth-btn {
+            width: 100%; padding: 13px; font-weight: 700; cursor: pointer; border: none;
+            font-size: 13px; letter-spacing: .3px; border-radius: 12px; margin-bottom: 10px;
+            transition: transform .15s, filter .15s, opacity .15s; position: relative;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .auth-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .auth-btn:active { transform: translateY(0); }
+        .auth-btn:disabled { opacity: .7; cursor: default; transform: none; }
+        #login-btn { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: var(--accent-text); box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 38%, transparent); }
+        #register-btn { background: var(--bg); color: var(--text-secondary); border: 1.5px solid var(--border); }
+        #register-btn:hover { color: var(--text); background: var(--surface-hover); }
+        #auth-error { font-size: 12px; color: var(--danger); text-align: center; margin-top: 5px; min-height: 18px; }
+
+        /* Основной интерфейс */
+        #messenger-container { display: none; width: 100vw; height: 100vh; background: var(--bg); }
+
+        /* Левая панель */
+        .sidebar { width: 330px; height: 100%; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .profile-bar { padding: 16px 18px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .profile-info { display: flex; align-items: center; gap: 11px; }
+        .avatar-main { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: var(--surface-2); border: 2px solid var(--border); }
+        #my-name { font-weight: 700; font-size: 14.5px; color: var(--text); }
+        .gear-btn {
+            background: var(--surface-2); border: none; color: var(--text-secondary); cursor: pointer;
+            font-size: 16px; width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; transition: .15s;
+        }
+        .gear-btn:hover { color: var(--text); background: var(--surface-hover); transform: rotate(35deg); }
+
+        /* Поиск и создание групп */
+        .search-bar-container { padding: 12px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+        .search-row { display: flex; gap: 6px; }
+        #search-input { flex: 1; padding: 9px 13px; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font-size: 13px; }
+        #search-input:focus { outline: none; border-color: var(--accent); }
+        #search-input::placeholder { color: var(--text-muted); }
+        .action-btn {
+            padding: 8px 14px; font-size: 12px; font-weight: 700; border: none; border-radius: 10px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 32px;
+            transition: filter .15s, transform .1s; color: #fff;
+        }
+        .action-btn:hover { filter: brightness(1.08); }
+        .action-btn:active { transform: scale(.97); }
+        .accept-btn { background: var(--success); color: #fff; }
+        .reject-btn { background: var(--danger); color: #fff; }
+
+        .search-result-panel { display: none; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 9px 10px; align-items: center; justify-content: space-between; }
+        .search-result-left { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+        .avatar-mini { width: 32px; height: 32px; object-fit: cover; border-radius: 50%; background: var(--surface-2); }
+
+        /* Вкладки */
+        .tabs-container { display: flex; gap: 4px; background: var(--bg); margin: 10px 12px 2px; padding: 4px; border-radius: 12px; }
+        .tab-btn {
+            flex: 1; padding: 9px 6px; background: none; border: none; color: var(--text-secondary);
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+            cursor: pointer; position: relative; border-radius: 9px; transition: .15s;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--text); background: var(--surface-2); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+        .badge {
+            position: absolute; top: 2px; right: 4px; background: var(--danger); color: #fff;
+            font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; display: none;
+        }
+
+        /* Списки */
+        .list-content { flex: 1; overflow-y: auto; padding: 6px 0; }
+        .list-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+            margin: 2px 8px; border-radius: 14px; cursor: pointer; transition: background .15s;
+        }
+        .list-item:hover { background: var(--surface-hover); }
+        .list-item.active { background: var(--surface-active); }
+        .item-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+        .item-left span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 13.5px; }
+        .actions-group { display: flex; gap: 6px; flex-shrink: 0; }
+
+        /* Правая панель чата */
+        .chat-area { flex: 1; height: 100%; display: flex; flex-direction: column; background: var(--bg); }
+        .chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: var(--text-muted); font-size: 14px; letter-spacing: .3px; }
+        .chat-main { display: none; flex-direction: column; flex: 1; height: 100%; }
+
+        .chat-header { padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .chat-header-left { display: flex; align-items: center; gap: 11px; }
+        #chat-target-name { font-weight: 700; color: var(--text); font-size: 15px; }
+
+        .messages-container { flex: 1; padding: 22px 26px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+        .msg { max-width: 62%; padding: 10px 15px; font-size: 14px; line-height: 1.5; word-wrap: break-word; display: flex; flex-direction: column; transition: opacity .2s; }
+        .msg.me { background: var(--msg-me-bg); color: var(--msg-me-text); align-self: flex-end; border-radius: 18px 18px 4px 18px; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent); }
+        .msg.other { background: var(--msg-other-bg); color: var(--msg-other-text); align-self: flex-start; border-radius: 18px 18px 18px 4px; border: 1px solid var(--border); }
+        .msg-author { font-size: 11px; font-weight: 700; opacity: .65; margin-bottom: 3px; }
+
+        .input-bar { padding: 16px 20px; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+        #message-input { flex: 1; padding: 12px 18px; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 24px; color: var(--text); font-size: 14px; }
+        #message-input::placeholder { color: var(--text-muted); }
+        #message-input:focus { outline: none; border-color: var(--accent); }
+        #send-btn {
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: var(--accent-text);
+            width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; font-size: 17px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent);
+            transition: transform .12s, filter .12s;
+        }
+        #send-btn:hover { transform: scale(1.06); filter: brightness(1.08); }
+        #send-btn:active { transform: scale(.96); }
+
+        /* Модальные окна */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+            width: 380px; padding: 26px; display: flex; flex-direction: column;
+            max-height: 88vh; overflow-y: auto; box-shadow: 0 30px 70px rgba(0,0,0,0.5);
+            animation: fadeScaleIn .18s ease;
+        }
+        .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 18px; color: var(--text); }
+        .modal-close-btn {
+            background: var(--bg); color: var(--text); border: 1.5px solid var(--border); border-radius: 12px;
+            padding: 10px; margin-top: 16px; cursor: pointer; font-weight: 700; text-align: center;
+            transition: .15s;
+        }
+        .modal-close-btn:hover { background: var(--surface-hover); }
+
+        .settings-section { margin-bottom: 16px; }
+        .settings-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: block; font-weight: 600; }
+        .error { color: var(--danger) !important; }
+        .success { color: var(--success) !important; }
+
+        /* Крутилка загрузки */
+        .spinner { width: 16px; height: 16px; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; border-radius: 50%; animation: spin 0.6s linear infinite; }
+
         /* Кастомный контекстный клик */
-        #context-menu { display: none; position: absolute; background: #1c1c1c; border: 1px solid #333; z-index: 2000; width: 160px; }
-        .context-item { padding: 10px; font-size: 13px; color: #fff; cursor: pointer; }
-        .context-item:hover { background: #2a2a2a; }
+        #context-menu { display: none; position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; z-index: 2000; width: 170px; padding: 4px; box-shadow: 0 15px 40px rgba(0,0,0,.4); }
+        .context-item { padding: 10px 12px; font-size: 13px; color: var(--text); cursor: pointer; border-radius: 9px; }
+        .context-item:hover { background: var(--surface-hover); }
+
+        /* Вкладки внутри настроек */
+        .settings-tabs-nav { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg); padding: 4px; border-radius: 12px; }
+        .settings-tab-btn {
+            flex: 1; padding: 9px 6px; border: none; background: none; color: var(--text-secondary);
+            font-size: 11.5px; font-weight: 700; letter-spacing: .3px; border-radius: 9px; cursor: pointer; transition: .15s;
+        }
+        .settings-tab-btn:hover { color: var(--text); }
+        .settings-tab-btn.active { background: var(--surface-2); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+        .settings-tab-content { display: none; }
+        .settings-tab-content.visible { display: block; }
+
+        /* Внешний вид: сетка тем */
+        .theme-presets-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .theme-preset-card {
+            border: 1.5px solid var(--border); border-radius: 14px; padding: 11px; cursor: pointer;
+            transition: transform .12s, border-color .12s; background: var(--bg);
+        }
+        .theme-preset-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+        .theme-preset-card.active { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent) inset; }
+        .theme-preset-swatch { display: flex; gap: 4px; margin-bottom: 9px; }
+        .theme-preset-swatch span { width: 22px; height: 22px; border-radius: 7px; display: block; border: 1px solid rgba(127,127,127,.18); }
+        .theme-preset-name { font-size: 12.5px; font-weight: 700; color: var(--text); }
+
+        .color-picker-grid { display: flex; flex-direction: column; gap: 8px; }
+        .color-picker-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--bg); padding: 9px 13px; border-radius: 11px; border: 1px solid var(--border);
+        }
+        .color-picker-row label { font-size: 13px; color: var(--text); font-weight: 500; }
+        .color-input { width: 44px; height: 30px; border: none; border-radius: 8px; background: none; cursor: pointer; padding: 0; }
+        .color-input::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-input::-webkit-color-swatch { border-radius: 8px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
     <!-- Показывается, пока проверяем сохранённую сессию - убирает "мигание" -->
     <!-- окна входа перед автоматическим перебросом в мессенджер -->
-    <div id="initial-loader" style="display:flex; width:32px; height:32px; border:3px solid rgba(255,255,255,0.15); border-top-color:#fff; border-radius:50%; animation: spin 0.6s linear infinite;"></div>
+    <div id="initial-loader" style="display:flex; width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation: spin 0.6s linear infinite;"></div>
 
     <!-- ОКНО АВТОРИЗАЦИИ -->
     <div id="auth-container">
@@ -130,16 +279,16 @@
                         <input type="text" id="search-input" placeholder="Найти пользователя...">
                         <button id="search-btn" class="action-btn accept-btn"><span class="btn-text">Найти</span></button>
                     </div>
-                    <button id="open-group-wizard-btn" class="action-btn" style="background:#333; color:#fff; width:100%;">+ Создать группу</button>
+                    <button id="open-group-wizard-btn" class="action-btn" style="background:var(--surface-2); color:var(--text); width:100%;">+ Создать группу</button>
                     
                     <div id="search-result-panel" class="search-result-panel">
                         <div id="search-profile-trigger" class="search-result-left">
                             <img id="search-result-avatar" class="avatar-mini" src="" alt="">
-                            <span id="search-result-name" style="font-size:13px; font-weight:bold; color:#fff;"></span>
+                            <span id="search-result-name" style="font-size:13px; font-weight:bold; color:var(--text);"></span>
                         </div>
                         <div style="display:flex; gap:4px;">
                             <button id="search-chat-btn" class="action-btn accept-btn" style="padding:4px 8px;">Чат</button>
-                            <button id="add-friend-action-btn" class="action-btn" style="background:#555; color:#fff; padding:4px 8px;">+</button>
+                            <button id="add-friend-action-btn" class="action-btn" style="background:var(--surface-2); color:var(--text); padding:4px 8px;">+</button>
                         </div>
                     </div>
                     <div id="search-error" style="font-size:11px; text-align:center;"></div>
@@ -166,14 +315,14 @@
                             <img id="chat-header-avatar" class="avatar-mini" src="" alt="" style="display:none;">
                             <span id="chat-target-name">Разговор</span>
                         </div>
-                        <button id="open-group-settings-btn" class="action-btn" style="background:#222; color:#ccc; border:1px solid #333; display:none;">Настройки группы</button>
+                        <button id="open-group-settings-btn" class="action-btn" style="background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border); display:none;">Настройки группы</button>
                     </div>
                     
                     <div id="messages" class="messages-container"></div>
                     
                     <div class="input-bar">
                         <input type="text" id="message-input" placeholder="Напишите сообщение..." autocomplete="off">
-                        <button id="send-btn">ОТПРАВИТЬ</button>
+                        <button id="send-btn">➤</button>
                     </div>
                 </div>
             </div>
@@ -185,12 +334,12 @@
     <div id="profile-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-title">Профиль пользователя</div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:20px;">
-                <img id="modal-profile-avatar" src="" style="width:80px; height:80px; object-fit:cover; background:#333;">
-                <div id="modal-profile-name" style="font-size:18px; font-weight:bold; color:#fff;"></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:22px;">
+                <img id="modal-profile-avatar" src="" style="width:88px; height:88px; border-radius:50%; object-fit:cover; background:var(--surface-2); border:3px solid var(--border);">
+                <div id="modal-profile-name" style="font-size:18px; font-weight:800; color:var(--text);"></div>
             </div>
-            <button id="modal-profile-chat-btn" class="action-btn accept-btn" style="width:100%; margin-bottom:10px; min-height:35px;">Написать сообщение</button>
-            <button id="modal-profile-friend-btn" class="action-btn" style="width:100%; min-height:35px; background:#28a745; color:#fff;">Добавить в друзья</button>
+            <button id="modal-profile-chat-btn" class="action-btn accept-btn" style="width:100%; margin-bottom:10px; min-height:38px;">Написать сообщение</button>
+            <button id="modal-profile-friend-btn" class="action-btn" style="width:100%; min-height:38px; background:var(--success); color:#fff;">Добавить в друзья</button>
             <div id="close-profile-modal" class="modal-close-btn">Закрыть</div>
         </div>
     </div>
@@ -198,35 +347,79 @@
     <!-- МОДАЛКА: НАСТРОЙКИ АККАУНТА -->
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-content">
-            <div class="modal-title">Настройки аккаунта</div>
-            
-            <div class="settings-section">
-                <span class="settings-label">Смена аватарки (Файл изображения)</span>
-                <input type="file" id="settings-avatar-file" accept="image/*" style="font-size:12px; margin-bottom:5px;">
-                <button id="save-avatar-btn" class="action-btn accept-btn" style="width:100%;">Обновить аватарку</button>
-                <div id="settings-avatar-msg" style="font-size:11px; margin-top:3px;"></div>
+            <div class="modal-title">Настройки</div>
+
+            <div class="settings-tabs-nav">
+                <button id="settings-tab-btn-profile" class="settings-tab-btn active">Профиль</button>
+                <button id="settings-tab-btn-appearance" class="settings-tab-btn">Внешний вид</button>
+                <button id="settings-tab-btn-account" class="settings-tab-btn">Аккаунт</button>
             </div>
 
-            <div class="settings-section" style="border-top:1px solid #222; padding-top:10px;">
-                <span class="settings-label">Изменение пароля</span>
-                <input type="password" id="settings-old-pass" class="input-field" placeholder="Старый пароль" style="margin-bottom:8px;">
-                <input type="password" id="settings-new-pass" class="input-field" placeholder="Новый пароль" style="margin-bottom:8px;">
-                <button id="save-password-btn" class="action-btn accept-btn" style="width:100%;">Изменить пароль</button>
-                <div id="settings-password-msg" style="font-size:11px; margin-top:3px;"></div>
-            </div>
+            <!-- ВКЛАДКА: ПРОФИЛЬ -->
+            <div id="settings-tab-profile" class="settings-tab-content visible">
+                <div class="settings-section">
+                    <span class="settings-label">Смена аватарки (Файл изображения)</span>
+                    <input type="file" id="settings-avatar-file" accept="image/*" style="font-size:12px; margin-bottom:8px;">
+                    <button id="save-avatar-btn" class="action-btn accept-btn" style="width:100%;">Обновить аватарку</button>
+                    <div id="settings-avatar-msg" style="font-size:11px; margin-top:5px;"></div>
+                </div>
 
-            <div class="settings-section" style="margin-top:20px; border-top:1px solid #333; padding-top:15px;">
-                <h3 style="margin-bottom:10px; font-size:14px; text-transform:uppercase; color:#aaa;">Управление аккаунтами</h3>
-                <div id="accounts-list" style="margin-bottom:10px;"></div>
-                <div style="display:flex; gap:10px;">
-                    <button id="logout-btn" class="action-btn reject-btn" style="flex:1;">Выйти</button>
-                    <button id="add-account-btn" class="action-btn accept-btn" style="flex:1;">+ Аккаунт</button>
+                <div class="settings-section" style="border-top:1px solid var(--border); padding-top:14px;">
+                    <span class="settings-label">Изменение пароля</span>
+                    <input type="password" id="settings-old-pass" class="input-field" placeholder="Старый пароль" style="margin-bottom:8px;">
+                    <input type="password" id="settings-new-pass" class="input-field" placeholder="Новый пароль" style="margin-bottom:8px;">
+                    <button id="save-password-btn" class="action-btn accept-btn" style="width:100%;">Изменить пароль</button>
+                    <div id="settings-password-msg" style="font-size:11px; margin-top:5px;"></div>
                 </div>
             </div>
 
-            <div class="settings-section" style="margin-top:20px; border-top:1px solid #333; padding-top:15px;">
-                <h3 style="margin-bottom:10px; font-size:14px; text-transform:uppercase; color:#aaa;">Безопасность</h3>
-                <div id="devices-list" style="display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto;"></div>
+            <!-- ВКЛАДКА: ВНЕШНИЙ ВИД -->
+            <div id="settings-tab-appearance" class="settings-tab-content">
+                <div class="settings-section">
+                    <span class="settings-label">Готовые темы</span>
+                    <div id="theme-presets-grid" class="theme-presets-grid"></div>
+                </div>
+
+                <div class="settings-section" style="margin-top:22px; border-top:1px solid var(--border); padding-top:16px;">
+                    <span class="settings-label">Свои цвета</span>
+                    <div class="color-picker-grid">
+                        <div class="color-picker-row">
+                            <label for="color-bg">Основной фон</label>
+                            <input type="color" id="color-bg" class="color-input">
+                        </div>
+                        <div class="color-picker-row">
+                            <label for="color-surface">Поверхности (панели)</label>
+                            <input type="color" id="color-surface" class="color-input">
+                        </div>
+                        <div class="color-picker-row">
+                            <label for="color-text">Цвет текста</label>
+                            <input type="color" id="color-text" class="color-input">
+                        </div>
+                        <div class="color-picker-row">
+                            <label for="color-accent">Акцентный цвет</label>
+                            <input type="color" id="color-accent" class="color-input">
+                        </div>
+                    </div>
+                    <button id="apply-custom-theme-btn" class="action-btn accept-btn" style="width:100%; margin-top:14px;">Применить свою тему</button>
+                    <button id="reset-theme-btn" class="action-btn" style="width:100%; margin-top:8px; background:var(--surface-2); color:var(--text-secondary);">Сбросить к теме по умолчанию</button>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА: АККАУНТ -->
+            <div id="settings-tab-account" class="settings-tab-content">
+                <div class="settings-section">
+                    <h3 style="margin-bottom:12px; font-size:13px; letter-spacing:.3px; color:var(--text-secondary); font-weight:700;">Управление аккаунтами</h3>
+                    <div id="accounts-list" style="margin-bottom:10px;"></div>
+                    <div style="display:flex; gap:10px;">
+                        <button id="logout-btn" class="action-btn reject-btn" style="flex:1;">Выйти</button>
+                        <button id="add-account-btn" class="action-btn accept-btn" style="flex:1;">+ Аккаунт</button>
+                    </div>
+                </div>
+
+                <div class="settings-section" style="margin-top:22px; border-top:1px solid var(--border); padding-top:16px;">
+                    <h3 style="margin-bottom:12px; font-size:13px; letter-spacing:.3px; color:var(--text-secondary); font-weight:700;">Безопасность</h3>
+                    <div id="devices-list" style="display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto;"></div>
+                </div>
             </div>
 
             <div id="close-settings-modal" class="modal-close-btn">Закрыть</div>
@@ -247,7 +440,7 @@
             </div>
             <div class="settings-section">
                 <span class="settings-label">Выберите участников (из списка друзей):</span>
-                <div id="wizard-friends-list" style="max-height:120px; overflow-y:auto; background:#181818; padding:5px; border:1px solid #333;">
+                <div id="wizard-friends-list" style="max-height:120px; overflow-y:auto; background:var(--surface-2); padding:8px; border-radius:10px; border:1px solid var(--border);">
                     <!-- Чекбоксы друзей подгрузятся сюда -->
                 </div>
             </div>
@@ -273,12 +466,12 @@
             
             <div class="settings-section">
                 <span class="settings-label">Участники группы</span>
-                <div id="group-members-manage-list" style="max-height:150px; overflow-y:auto; background:#181818; padding:5px; border:1px solid #333; display:flex; flex-direction:column; gap:5px;"></div>
+                <div id="group-members-manage-list" style="max-height:150px; overflow-y:auto; background:var(--surface-2); padding:8px; border-radius:10px; border:1px solid var(--border); display:flex; flex-direction:column; gap:6px;"></div>
             </div>
 
-            <div id="group-invite-zone" class="settings-section" style="display:none; border-top:1px solid #222; padding-top:10px;">
+            <div id="group-invite-zone" class="settings-section" style="display:none; border-top:1px solid var(--border); padding-top:12px;">
                 <span class="settings-label">Пригласить друзей</span>
-                <div id="group-invite-friends-list" style="max-height:100px; overflow-y:auto; background:#181818; padding:5px; border:1px solid #333;"></div>
+                <div id="group-invite-friends-list" style="max-height:100px; overflow-y:auto; background:var(--surface-2); padding:8px; border-radius:10px; border:1px solid var(--border);"></div>
             </div>
 
             <button id="save-group-settings-btn" class="action-btn accept-btn" style="width:100%; margin-top:10px; display:none;">Сохранить изменения</button>
@@ -288,7 +481,7 @@
 
     <!-- КАСТОМНОЕ КОНТЕКСТНОЕ МЕНЮ (ПКМ) -->
     <div id="context-menu">
-        <div id="context-leave-item" class="context-item" style="color:#ff6b6b;">Покинуть группу</div>
+        <div id="context-leave-item" class="context-item" style="color:var(--danger);">Покинуть группу</div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -304,6 +497,170 @@
         let currentTab = 'chats';
         let contextTargetChatId = null;
         let currentGroupData = null; // Для хранения текущей группы в настройках
+
+        // ================= СИСТЕМА ТЕМ ОФОРМЛЕНИЯ =================
+
+        const THEME_STORAGE_KEY = 'giga_theme_v1';
+
+        const THEME_PRESETS = [
+            { id: 'aurora',   name: 'Аврора',   bg: '#0f1117', surface: '#171a23', text: '#e8e9f2', accent: '#7c5cff' },
+            { id: 'ocean',    name: 'Океан',    bg: '#0a141f', surface: '#101f2e', text: '#dbe8f0', accent: '#22c3c9' },
+            { id: 'sunset',   name: 'Закат',    bg: '#1a1210', surface: '#241713', text: '#f3e5de', accent: '#ff7a45' },
+            { id: 'forest',   name: 'Лес',      bg: '#0e1613', surface: '#16201a', text: '#dceae1', accent: '#33d399' },
+            { id: 'rose',     name: 'Роза',     bg: '#170f14', surface: '#221620', text: '#f2e2ea', accent: '#f4478f' },
+            { id: 'graphite', name: 'Графит',   bg: '#121212', surface: '#1c1c1e', text: '#ececec', accent: '#5b8def' },
+            { id: 'noir',     name: 'Чёрный',   bg: '#000000', surface: '#0c0c0c', text: '#ffffff', accent: '#3d8bfd' },
+            { id: 'daylight', name: 'Светлый',  bg: '#eef0f5', surface: '#ffffff', text: '#1b1e27', accent: '#5b5cf0' }
+        ];
+
+        function hexToRgb(hex) {
+            hex = (hex || '#000000').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+            const num = parseInt(hex, 16) || 0;
+            return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+        }
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+        }
+        function blendHex(hexA, hexB, ratio) {
+            const a = hexToRgb(hexA), b = hexToRgb(hexB);
+            return rgbToHex(a.r + (b.r - a.r) * ratio, a.g + (b.g - a.g) * ratio, a.b + (b.b - a.b) * ratio);
+        }
+        function relativeLuminance(hex) {
+            const { r, g, b } = hexToRgb(hex);
+            const [rs, gs, bs] = [r, g, b].map(v => {
+                v /= 255;
+                return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+        }
+        function contrastText(hex) {
+            return relativeLuminance(hex) > 0.5 ? '#14151a' : '#ffffff';
+        }
+        function rgbaFromHex(hex, alpha) {
+            const { r, g, b } = hexToRgb(hex);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function computeThemeVars({ bg, surface, text, accent }) {
+            const accentText = contrastText(accent);
+            const accentLum = relativeLuminance(accent);
+            return {
+                '--bg': bg,
+                '--surface': surface,
+                '--surface-2': blendHex(surface, text, 0.055),
+                '--surface-hover': blendHex(surface, text, 0.09),
+                '--surface-active': blendHex(surface, accent, 0.22),
+                '--border': blendHex(surface, text, 0.14),
+                '--text': text,
+                '--text-secondary': rgbaFromHex(text, 0.64),
+                '--text-muted': rgbaFromHex(text, 0.42),
+                '--accent': accent,
+                '--accent-hover': blendHex(accent, accentLum > 0.5 ? '#000000' : '#ffffff', 0.16),
+                '--accent-text': accentText,
+                '--msg-me-bg': accent,
+                '--msg-me-text': accentText,
+                '--msg-other-bg': blendHex(surface, text, 0.07),
+                '--msg-other-text': text,
+                '--danger': '#f0454f',
+                '--success': '#33c17a',
+                '--scrollbar-thumb': blendHex(surface, text, 0.2)
+            };
+        }
+
+        function applyThemeVars(vars) {
+            const root = document.documentElement;
+            Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+        }
+
+        function syncColorInputs(colors) {
+            document.getElementById('color-bg').value = colors.bg;
+            document.getElementById('color-surface').value = colors.surface;
+            document.getElementById('color-text').value = colors.text;
+            document.getElementById('color-accent').value = colors.accent;
+        }
+
+        function updatePresetGridActive(presetId) {
+            document.querySelectorAll('.theme-preset-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.presetId === presetId);
+            });
+        }
+
+        function applyPresetTheme(presetId, save = true) {
+            const preset = THEME_PRESETS.find(p => p.id === presetId) || THEME_PRESETS[0];
+            applyThemeVars(computeThemeVars(preset));
+            updatePresetGridActive(preset.id);
+            syncColorInputs(preset);
+            if (save) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ mode: 'preset', presetId: preset.id }));
+        }
+
+        function applyCustomTheme(colors, save = true) {
+            applyThemeVars(computeThemeVars(colors));
+            updatePresetGridActive(null);
+            if (save) localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ mode: 'custom', colors }));
+        }
+
+        function renderThemePresetsGrid() {
+            const grid = document.getElementById('theme-presets-grid');
+            grid.innerHTML = '';
+            THEME_PRESETS.forEach(preset => {
+                const card = document.createElement('div');
+                card.className = 'theme-preset-card';
+                card.dataset.presetId = preset.id;
+                card.innerHTML = `
+                    <div class="theme-preset-swatch">
+                        <span style="background:${preset.bg}"></span>
+                        <span style="background:${preset.surface}"></span>
+                        <span style="background:${preset.accent}"></span>
+                    </div>
+                    <div class="theme-preset-name">${preset.name}</div>
+                `;
+                card.addEventListener('click', () => applyPresetTheme(preset.id));
+                grid.appendChild(card);
+            });
+        }
+
+        function loadThemeFromStorage() {
+            try {
+                const raw = localStorage.getItem(THEME_STORAGE_KEY);
+                if (!raw) { applyPresetTheme('aurora', false); return; }
+                const data = JSON.parse(raw);
+                if (data.mode === 'custom' && data.colors) {
+                    applyCustomTheme(data.colors, false);
+                    syncColorInputs(data.colors);
+                } else {
+                    applyPresetTheme(data.presetId || 'aurora', false);
+                }
+            } catch (e) { applyPresetTheme('aurora', false); }
+        }
+
+        renderThemePresetsGrid();
+        loadThemeFromStorage();
+
+        document.getElementById('apply-custom-theme-btn').addEventListener('click', () => {
+            const colors = {
+                bg: document.getElementById('color-bg').value,
+                surface: document.getElementById('color-surface').value,
+                text: document.getElementById('color-text').value,
+                accent: document.getElementById('color-accent').value
+            };
+            applyCustomTheme(colors);
+        });
+
+        document.getElementById('reset-theme-btn').addEventListener('click', () => {
+            localStorage.removeItem(THEME_STORAGE_KEY);
+            applyPresetTheme('aurora');
+        });
+
+        function switchSettingsTab(tabName) {
+            document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('visible'));
+            document.getElementById(`settings-tab-btn-${tabName}`).classList.add('active');
+            document.getElementById(`settings-tab-${tabName}`).classList.add('visible');
+        }
+        document.getElementById('settings-tab-btn-profile').addEventListener('click', () => switchSettingsTab('profile'));
+        document.getElementById('settings-tab-btn-appearance').addEventListener('click', () => switchSettingsTab('appearance'));
+        document.getElementById('settings-tab-btn-account').addEventListener('click', () => switchSettingsTab('account'));
 
         // Кэш последних загруженных списков — при переключении вкладок и даже
         // после перезагрузки страницы показываем их МГНОВЕННО из localStorage,
@@ -437,11 +794,14 @@
             const canvas = document.createElement('canvas');
             canvas.width = 100; canvas.height = 100;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#4a4a4a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const styles = getComputedStyle(document.documentElement);
+            const bgColor = (styles.getPropertyValue('--accent') || '#4a4a4a').trim() || '#4a4a4a';
+            const fgColor = (styles.getPropertyValue('--accent-text') || '#ffffff').trim() || '#ffffff';
+            ctx.fillStyle = bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
             const letter = username ? username.trim().charAt(0).toUpperCase() : '?';
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 50px sans-serif';
+            ctx.fillStyle = fgColor; ctx.font = 'bold 50px Inter, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(letter, 50, 52);
+            ctx.fillText(letter, 50, 54);
             return canvas.toDataURL();
         }
 
@@ -601,12 +961,12 @@
                 const friends = await res.json();
                 wList.innerHTML = '';
                 if(friends.length === 0) {
-                    wList.innerHTML = '<span style="color:#666; font-size:12px;">У вас нет друзей для приглашения</span>';
+                    wList.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">У вас нет друзей для приглашения</span>';
                     return;
                 }
                 friends.forEach(f => {
                     const label = document.createElement('label');
-                    label.style.cssText = "display:flex; align-items:center; gap:8px; margin-bottom:5px; color:#fff; font-size:13px; cursor:pointer;";
+                    label.style.cssText = "display:flex; align-items:center; gap:8px; margin-bottom:5px; color:var(--text); font-size:13px; cursor:pointer;";
                     label.innerHTML = `<input type="checkbox" value="${f.username}"> <span>${f.username}</span>`;
                     wList.appendChild(label);
                 });
@@ -674,7 +1034,7 @@
 
             currentGroupData.participants.forEach(p => {
                 const row = document.createElement('div');
-                row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:#222; padding:6px; font-size:13px; color:#fff;";
+                row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:var(--surface-hover); padding:7px 10px; border-radius:10px; font-size:13px; color:var(--text);";
                 
                 const isTargetAdmin = currentGroupData.admins.includes(p);
                 const isCreator = currentGroupData.creator === p;
@@ -720,13 +1080,13 @@
                 
                 const candidates = friends.filter(f => !currentGroupData.participants.includes(f.username));
                 if (candidates.length === 0) {
-                    container.innerHTML = '<span style="color:#666; font-size:11px;">Все друзья уже в группе</span>';
+                    container.innerHTML = '<span style="color:var(--text-muted); font-size:11px;">Все друзья уже в группе</span>';
                     return;
                 }
 
                 candidates.forEach(f => {
                     const row = document.createElement('div');
-                    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; font-size:12px;";
+                    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; font-size:12px; color:var(--text);";
                     row.innerHTML = `
                         <span>${f.username}</span>
                         <button class="action-btn accept-btn" style="min-height:20px; font-size:10px; padding:2px 6px;" onclick="inviteFriendToGroupInMemory('${f.username}')">Добавить</button>
@@ -838,16 +1198,16 @@
                 };
 
                 modalProfileFriendBtn.disabled = false;
-                modalProfileFriendBtn.style.background = '#28a745';
+                modalProfileFriendBtn.style.background = 'var(--success)';
 
                 if (relData.status === 'friends') {
                     modalProfileFriendBtn.innerText = 'Добавлен в друзья';
                     modalProfileFriendBtn.disabled = true;
-                    modalProfileFriendBtn.style.background = '#555';
+                    modalProfileFriendBtn.style.background = 'var(--surface-2)';
                 } else if (relData.status === 'sent') {
                     modalProfileFriendBtn.innerText = 'Заявка отправлена';
                     modalProfileFriendBtn.disabled = true;
-                    modalProfileFriendBtn.style.background = '#555';
+                    modalProfileFriendBtn.style.background = 'var(--surface-2)';
                 } else if (relData.status === 'received') {
                     modalProfileFriendBtn.innerText = 'Принять заявку';
                     modalProfileFriendBtn.onclick = async () => {
@@ -890,7 +1250,7 @@
 
         function renderChats(chats) {
             if(!chats || chats.length === 0) {
-                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
+                listContent.innerHTML = '<div style="padding:15px; color:var(--text-muted); font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
                 return;
             }
 
@@ -964,7 +1324,7 @@
             // Чистим окно сообщений сразу же — раньше старая переписка
             // оставалась на экране, пока не придёт история нового чата,
             // из-за чего переключение выглядело "подвисшим".
-            messagesContainer.innerHTML = '<div style="text-align:center; color:#444; font-size:12px; padding:20px;">Загрузка сообщений...</div>';
+            messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">Загрузка сообщений...</div>';
             pendingSentMessages.length = 0;
 
             const hAvatar = document.getElementById('chat-header-avatar');
@@ -1004,7 +1364,7 @@
 
         function renderFriends(friends) {
             if(!friends || friends.length === 0) {
-                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Список друзей пока пуст</div>';
+                listContent.innerHTML = '<div style="padding:15px; color:var(--text-muted); font-size:13px; text-align:center;">Список друзей пока пуст</div>';
                 return;
             }
 
@@ -1049,7 +1409,7 @@
 
         function renderRequests(requests) {
             if(!requests || requests.length === 0) {
-                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Нет входящих заявок</div>';
+                listContent.innerHTML = '<div style="padding:15px; color:var(--text-muted); font-size:13px; text-align:center;">Нет входящих заявок</div>';
                 return;
             }
 
@@ -1166,6 +1526,7 @@
             document.getElementById('settings-avatar-file').value = "";
             document.getElementById('settings-avatar-msg').innerText = "";
             document.getElementById('settings-password-msg').innerText = "";
+            switchSettingsTab('profile');
             renderAccountsList();
             loadSecurityDevices();
             settingsModal.style.display = 'flex';
@@ -1178,13 +1539,13 @@
             
             Object.values(accounts).forEach(acc => {
                 const row = document.createElement('div');
-                row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border:1px solid #333; margin-bottom:5px; font-size:13px;";
+                row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:var(--surface-hover); padding:9px 10px; border-radius:11px; margin-bottom:6px; font-size:13px;";
                 const isCurrent = acc.username === currentUser;
                 
                 row.innerHTML = `
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <img src="${getAvatarSrc(acc.avatarUrl, acc.username)}" style="width:24px; height:24px; object-fit:cover;">
-                        <span style="font-weight:${isCurrent ? 'bold' : 'normal'}; color:${isCurrent ? '#6bff6b' : '#fff'}">${acc.username}</span>
+                        <img src="${getAvatarSrc(acc.avatarUrl, acc.username)}" style="width:26px; height:26px; border-radius:50%; object-fit:cover;">
+                        <span style="font-weight:${isCurrent ? '700' : '500'}; color:${isCurrent ? 'var(--success)' : 'var(--text)'}">${acc.username}</span>
                     </div>
                     ${!isCurrent ? `<button class="action-btn accept-btn" style="min-height:22px; font-size:11px; padding:2px 8px;" onclick="switchActiveAccount('${acc.username}')">Войти</button>` : ''}
                 `;
@@ -1220,7 +1581,7 @@
                 listContainer.innerHTML = '';
                 devices.forEach(dev => {
                     const item = document.createElement('div');
-                    item.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:#1b1b1b; padding:8px; border-left:3px solid ${dev.isCurrent ? '#28a745' : '#555'}; font-size:12px;`;
+                    item.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:var(--surface-hover); border-radius:10px; padding:9px 10px; border-left:3px solid ${dev.isCurrent ? 'var(--success)' : 'var(--border)'}; font-size:12px;`;
                     
                     let devName = "Устройство";
                     if (dev.userAgent.includes("Chrome")) devName = "Chrome / Windows";
@@ -1229,8 +1590,8 @@
 
                     item.innerHTML = `
                         <div>
-                            <div style="font-weight:bold; color:${dev.isCurrent ? '#6bff6b' : '#fff'}">${devName}</div>
-                            <div style="color:#888; font-size:10px;">IP: ${dev.ip}</div>
+                            <div style="font-weight:700; color:${dev.isCurrent ? 'var(--success)' : 'var(--text)'}">${devName}</div>
+                            <div style="color:var(--text-muted); font-size:10px;">IP: ${dev.ip}</div>
                         </div>
                         ${!dev.isCurrent ? `<button class="action-btn reject-btn" style="min-height:22px; font-size:10px; padding:2px 6px;" onclick="terminateDeviceSession('${dev.id}')">X</button>` : ''}
                     `;
@@ -1294,7 +1655,7 @@
                         currentUserAvatar = d.avatarUrl;
                         document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
                         saveAccountToStorage(currentUser, currentUserAvatar, currentUserToken);
-                        msg.style.color = '#6bff6b'; msg.innerText = "Аватар изменен!";
+                        msg.style.color = 'var(--success)'; msg.innerText = "Аватар изменен!";
                     }
                 } catch(e){}
                 finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
@@ -1315,11 +1676,11 @@
                     body: JSON.stringify({ oldPassword, newPassword })
                 });
                 if(res.ok) {
-                    msg.style.color = '#6bff6b'; msg.innerText = "Пароль изменен!";
+                    msg.style.color = 'var(--success)'; msg.innerText = "Пароль изменен!";
                     document.getElementById('settings-old-pass').value = '';
                     document.getElementById('settings-new-pass').value = '';
                 } else {
-                    const d = await res.json(); msg.style.color = '#ff6b6b'; msg.innerText = d.error;
+                    const d = await res.json(); msg.style.color = 'var(--danger)'; msg.innerText = d.error;
                 }
             } catch(e){}
             finally { toggleLoading(document.getElementById('save-password-btn'), false); }
@@ -1391,7 +1752,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: u, password: p })
                 });
-                if (res.ok) { authError.style.color = '#6bff6b'; authError.innerText = "Успешно! Войдите."; }
+                if (res.ok) { authError.style.color = 'var(--success)'; authError.innerText = "Успешно! Войдите."; }
                 else { const d = await res.json(); authError.innerText = d.error; }
             } catch (err) {} 
             finally { toggleLoading(document.getElementById('register-btn'), false); }
