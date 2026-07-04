@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -33,6 +34,16 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('GigaUser', UserSchema);
 
+// Схема для хранения сессий устройств
+const SessionSchema = new mongoose.Schema({
+    username: { type: String, required: true },
+    token: { type: String, required: true, unique: true },
+    userAgent: { type: String, default: 'Unknown Device' },
+    ip: { type: String, default: '0.0.0.0' },
+    lastSeen: { type: Date, default: Date.now }
+});
+const Session = mongoose.model('GigaSession', SessionSchema);
+
 const ChatSchema = new mongoose.Schema({
     participants: [{ type: String }]
 });
@@ -53,6 +64,28 @@ const FriendshipSchema = new mongoose.Schema({
 });
 const Friendship = mongoose.model('GigaFriendship', FriendshipSchema);
 
+// Middleware для валидации токена сессии
+async function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Токен отсутствует' });
+
+    try {
+        const session = await Session.findOne({ token });
+        if (!session) return res.status(403).json({ error: 'Сессия недействительна или завершена' });
+        
+        // Обновляем IP и время активности при запросе
+        session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || session.ip;
+        session.lastSeen = new Date();
+        await session.save();
+
+        req.username = session.username;
+        req.token = token;
+        next();
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка аутентификации' });
+    }
+}
 
 // ================= HTTP ЭНДПОИНТЫ =================
 
@@ -79,9 +112,75 @@ app.post('/api/login', async (req, res) => {
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({ error: 'Неверный логин или пароль' });
         }
-        res.json({ username: user.username, avatarUrl: user.avatarUrl || `letter:${user.username}` });
+
+        // Создаем долговечный токен устройства
+        const token = crypto.randomBytes(32).toString('hex');
+        const userAgent = req.headers['user-agent'] || 'Unknown Device';
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0';
+
+        const newSession = new Session({ username: user.username, token, userAgent, ip });
+        await newSession.save();
+
+        res.json({ 
+            username: user.username, 
+            avatarUrl: user.avatarUrl || `letter:${user.username}`,
+            token: token
+        });
     } catch (error) {
         res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// Проверка существующей сессии при загрузке страницы
+app.post('/api/auth/verify', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.username });
+        if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+        res.json({ username: user.username, avatarUrl: user.avatarUrl || `letter:${user.username}`, token: req.token });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка проверки сессии' });
+    }
+});
+
+// Выход из конкретной сессии
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+    try {
+        await Session.deleteOne({ token: req.token });
+        res.json({ message: 'Выход совершен успешно' });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка выхода' });
+    }
+});
+
+// Получение списка всех устройств/сессий пользователя
+app.get('/api/security/devices', authenticateToken, async (req, res) => {
+    try {
+        const sessions = await Session.find({ username: req.username }).sort({ lastSeen: -1 });
+        const devices = sessions.map(s => ({
+            id: s._id,
+            userAgent: s.userAgent,
+            ip: s.ip,
+            lastSeen: s.lastSeen,
+            isCurrent: s.token === req.token
+        }));
+        res.json(devices);
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка получения устройств' });
+    }
+});
+
+// Удаление сессии конкретного устройства
+app.delete('/api/security/devices/:id', authenticateToken, async (req, res) => {
+    try {
+        const targetSession = await Session.findById(req.params.id);
+        if (!targetSession || targetSession.username !== req.username) {
+            return res.status(404).json({ error: 'Сессия не найдена' });
+        }
+        
+        await Session.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Устройство успешно отключено' });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка удаления устройства' });
     }
 });
 

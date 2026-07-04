@@ -188,6 +188,20 @@
             <button id="save-password-btn" style="margin-top:5px; height:32px; min-height:auto; background:#444;"><span class="btn-text">Сохранить пароль</span></button>
             <p id="settings-password-msg" style="font-size:12px; margin:2px 0;" class="error"></p>
         </div>
+        <div class="settings-section" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+            <h3 style="margin-bottom: 10px; font-size: 14px; text-transform: uppercase; color: #aaa;">Управление аккаунтами</h3>
+            <div id="accounts-list" style="margin-bottom: 10px;"></div>
+            <div style="display: flex; gap: 10px;">
+                <button id="logout-btn" class="action-btn reject-btn" style="flex: 1;">Выйти из аккаунта</button>
+                <button id="add-account-btn" class="action-btn accept-btn" style="flex: 1;">Сменить / Добавить аккаунт</button>
+            </div>
+        </div>
+
+        <div class="settings-section" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+            <h3 style="margin-bottom: 10px; font-size: 14px; text-transform: uppercase; color: #aaa;">Безопасность (Активные устройства)</h3>
+            <div id="devices-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto;">
+                </div>
+        </div>
     </div>
 </div>
 
@@ -198,6 +212,7 @@
 
     let currentUser = null;
     let currentUserAvatar = null;
+    let currentUserToken = null;
     let activeChatId = null;
     let socket = null;
     let currentTab = 'chats';
@@ -227,39 +242,90 @@
     const settingsModal = document.getElementById('settings-modal');
     const chatTargetName = document.getElementById('chat-target-name');
 
-    // Клик по имени в шапке открывает профиль собеседника
     chatTargetName.style.cursor = 'pointer';
     chatTargetName.addEventListener('click', () => {
         const targetUser = chatTargetName.innerText;
-        if (targetUser) {
-            showUserProfile(targetUser);
-        }
+        if (targetUser) showUserProfile(targetUser);
     });
+
+    // АВТОМАТИЧЕСКИЙ ВХОД И МУЛЬТИАККАУНТИНГ
+    window.addEventListener('DOMContentLoaded', async () => {
+        const accounts = getSavedAccounts();
+        const activeUser = localStorage.getItem('giga_active_user');
+        
+        if (activeUser && accounts[activeUser]) {
+            const verified = await verifySession(accounts[activeUser].token);
+            if (verified) {
+                initMessenger(verified.username, verified.avatarUrl, verified.token);
+                return;
+            } else {
+                removeAccountFromStorage(activeUser);
+            }
+        }
+        
+        // Если живой сессии нет, показываем окно авторизации
+        authContainer.style.display = 'flex';
+        messengerContainer.style.display = 'none';
+    });
+
+    function getSavedAccounts() {
+        return JSON.parse(localStorage.getItem('giga_accounts') || '{}');
+    }
+
+    function saveAccountToStorage(username, avatarUrl, token) {
+        const accounts = getSavedAccounts();
+        if (Object.keys(accounts).length >= 5 && !accounts[username]) {
+            alert("Максимальное количество аккаунтов: 5");
+            return false;
+        }
+        accounts[username] = { username, avatarUrl, token };
+        localStorage.setItem('giga_accounts', JSON.stringify(accounts));
+        localStorage.setItem('giga_active_user', username);
+        return true;
+    }
+
+    function removeAccountFromStorage(username) {
+        const accounts = getSavedAccounts();
+        delete accounts[username];
+        localStorage.setItem('giga_accounts', JSON.stringify(accounts));
+        
+        const remaining = Object.keys(accounts);
+        if (remaining.length > 0) {
+            localStorage.setItem('giga_active_user', remaining[0]);
+        } else {
+            localStorage.removeItem('giga_active_user');
+        }
+    }
+
+    async function verifySession(token) {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/auth/verify`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) return await res.json();
+        } catch(e) {}
+        return null;
+    }
 
     function generateLetterAvatar(username) {
         const canvas = document.createElement('canvas');
         canvas.width = 100;
         canvas.height = 100;
         const ctx = canvas.getContext('2d');
-
         ctx.fillStyle = '#4a4a4a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
         const firstLetter = username ? username.trim().charAt(0).toUpperCase() : '?';
-        
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 50px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(firstLetter, 50, 52);
-
         return canvas.toDataURL();
     }
 
     function getAvatarSrc(avatarUrl, username) {
-        if (avatarUrl && avatarUrl.startsWith('data:image')) {
-            return avatarUrl;
-        }
+        if (avatarUrl && avatarUrl.startsWith('data:image')) return avatarUrl;
         return generateLetterAvatar(username);
     }
 
@@ -279,14 +345,17 @@
         }
     }
 
-    function initMessenger(username, avatarUrl) {
+    function initMessenger(username, avatarUrl, token) {
         currentUser = username;
         currentUserAvatar = avatarUrl;
+        currentUserToken = token;
+        
         authContainer.style.display = 'none';
         messengerContainer.style.display = 'flex';
         document.getElementById('my-name').innerText = currentUser;
         document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
 
+        if (socket) socket.disconnect();
         socket = io(SOCKET_URL);
 
         socket.on('load_history', (messages) => {
@@ -295,9 +364,7 @@
         });
 
         socket.on('receive_message', (msgData) => {
-            if (msgData.chatId === activeChatId) {
-                appendMessage(msgData);
-            }
+            if (msgData.chatId === activeChatId) appendMessage(msgData);
         });
 
         switchTab('chats');
@@ -305,7 +372,8 @@
     }
 
     function startUpdateLoop() {
-        setInterval(() => {
+        if (window.gigaInterval) clearInterval(window.gigaInterval);
+        window.gigaInterval = setInterval(() => {
             updateBadges();
             if(currentTab === 'requests') loadIncomingRequests();
             if(currentTab === 'friends') loadFriendsList();
@@ -479,8 +547,6 @@
         activeChatId = chatId;
         chatPlaceholder.style.display = 'none';
         chatMain.style.display = 'flex';
-        
-        // Помещаем в шапку только чистый ник без лишнего текста
         chatTargetName.innerText = targetUser;
         
         const hAvatar = document.getElementById('chat-header-avatar');
@@ -662,11 +728,130 @@
         finally { toggleLoading(addFriendActionBtn, false); }
     });
 
+    // УПРАВЛЕНИЕ МУЛЬТИАККАУНТАМИ И БЕЗОПАСНОСТЬЮ В НАСТРОЙКАХ
     document.getElementById('open-settings-btn').addEventListener('click', () => {
         document.getElementById('settings-avatar-file').value = "";
         document.getElementById('settings-avatar-msg').innerText = "";
         document.getElementById('settings-password-msg').innerText = "";
+        renderAccountsList();
+        loadSecurityDevices();
         settingsModal.style.display = 'flex';
+    });
+
+    function renderAccountsList() {
+        const listContainer = document.getElementById('accounts-list');
+        listContainer.innerHTML = '';
+        const accounts = getSavedAccounts();
+        
+        Object.values(accounts).forEach(acc => {
+            const row = document.createElement('div');
+            row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border:1px solid #333; margin-bottom:5px; font-size:13px;";
+            
+            const isCurrent = acc.username === currentUser;
+            
+            row.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <img src="${getAvatarSrc(acc.avatarUrl, acc.username)}" style="width:24px; height:24px; object-fit:cover;">
+                    <span style="font-weight:${isCurrent ? 'bold' : 'normal'}; color:${isCurrent ? '#6bff6b' : '#fff'}">${acc.username} ${isCurrent ? '(Активен)' : ''}</span>
+                </div>
+                ${!isCurrent ? `<button class="action-btn accept-btn" style="min-height:22px; font-size:11px; padding:2px 8px;" onclick="switchActiveAccount('${acc.username}')">Войти</button>` : ''}
+            `;
+            listContainer.appendChild(row);
+        });
+    }
+
+    async function switchActiveAccount(username) {
+        const accounts = getSavedAccounts();
+        if (accounts[username]) {
+            const verified = await verifySession(accounts[username].token);
+            if (verified) {
+                localStorage.setItem('giga_active_user', username);
+                settingsModal.style.display = 'none';
+                initMessenger(verified.username, verified.avatarUrl, verified.token);
+            } else {
+                alert("Сессия устарела, войдите заново.");
+                removeAccountFromStorage(username);
+                renderAccountsList();
+            }
+        }
+    }
+
+    async function loadSecurityDevices() {
+        const listContainer = document.getElementById('devices-list');
+        listContainer.innerHTML = '<span style="color:#666; font-size:12px;">Загрузка устройств...</span>';
+        
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/security/devices`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${currentUserToken}` }
+            });
+            if (!res.ok) return;
+            const devices = await res.json();
+            
+            listContainer.innerHTML = '';
+            devices.forEach(dev => {
+                const item = document.createElement('div');
+                item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1b1b1b; padding:8px; border-left:3px solid ${dev.isCurrent ? '#28a745' : '#555'}; font-size:12px;";
+                
+                // Извлекаем понятное имя браузера из userAgent
+                let deviceName = "Браузер / Устройство";
+                if (dev.userAgent.includes("Chrome")) deviceName = "Chrome / Windows";
+                else if (dev.userAgent.includes("Firefox")) deviceName = "Firefox";
+                else if (dev.userAgent.includes("Safari") && !dev.userAgent.includes("Chrome")) deviceName = "Safari";
+                
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight:bold; color:${dev.isCurrent ? '#6bff6b' : '#fff'}">${deviceName} ${dev.isCurrent ? '(Текущее)' : ''}</div>
+                        <div style="color:#888; font-size:11px;">IP: ${dev.ip} | Активность: ${new Date(dev.lastSeen).toLocaleTimeString()}</div>
+                    </div>
+                    ${!dev.isCurrent ? `<button class="action-btn reject-btn" style="min-height:22px; font-size:10px; padding:2px 6px;" onclick="terminateDeviceSession('${dev.id}')">Отключить</button>` : ''}
+                `;
+                listContainer.appendChild(item);
+            });
+        } catch(e) {
+            listContainer.innerHTML = '<span style="color:#ff6b6b; font-size:12px;">Ошибка загрузки списка</span>';
+        }
+    }
+
+    async function terminateDeviceSession(sessionId) {
+        if (!confirm("Завершить сессию на этом устройстве?")) return;
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/security/devices/${sessionId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${currentUserToken}` }
+            });
+            if (res.ok) loadSecurityDevices();
+        } catch(e){}
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        if (!confirm("Вы уверены, что хотите выйти из текущего аккаунта?")) return;
+        try {
+            await fetch(`${BACKEND_URL}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${currentUserToken}` }
+            });
+        } catch(e){}
+        
+        removeAccountFromStorage(currentUser);
+        settingsModal.style.display = 'none';
+        
+        const accounts = getSavedAccounts();
+        const remaining = Object.keys(accounts);
+        if (remaining.length > 0) {
+            switchActiveAccount(remaining[0]);
+        } else {
+            authContainer.style.display = 'flex';
+            messengerContainer.style.display = 'none';
+            if (socket) socket.disconnect();
+        }
+    });
+
+    document.getElementById('add-account-btn').addEventListener('click', () => {
+        settingsModal.style.display = 'none';
+        authContainer.style.display = 'flex';
+        messengerContainer.style.display = 'none';
+        if (socket) socket.disconnect();
     });
 
     document.getElementById('save-avatar-btn').addEventListener('click', async () => {
@@ -675,25 +860,14 @@
         const msg = document.getElementById('settings-avatar-msg');
         msg.innerText = "";
 
-        if(!file) {
-            msg.className = "error";
-            msg.innerText = "Выберите файл для загрузки!";
-            return;
-        }
-
-        if (file.size > 3 * 1024 * 1024) {
-            msg.className = "error";
-            msg.innerText = "Файл слишком большой. Максимум 3 МБ.";
-            return;
-        }
+        if(!file) { msg.className = "error"; msg.innerText = "Выберите файл!"; return; }
+        if (file.size > 3 * 1024 * 1024) { msg.className = "error"; msg.innerText = "Максимум 3 МБ."; return; }
 
         toggleLoading(document.getElementById('save-avatar-btn'), true);
-
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = async () => {
             const base64data = reader.result;
-
             try {
                 const res = await fetch(`${BACKEND_URL}/api/settings/update-avatar`, {
                     method: 'POST',
@@ -704,13 +878,10 @@
                 if(res.ok) {
                     currentUserAvatar = data.avatarUrl;
                     document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
-                    msg.className = "success";
-                    msg.innerText = "Аватарка успешно обновлена!";
+                    saveAccountToStorage(currentUser, currentUserAvatar, currentUserToken);
+                    msg.className = "success"; msg.innerText = "Аватарка обновлена!";
                     if(currentTab === 'chats') loadMyChats();
-                } else {
-                    msg.className = "error";
-                    msg.innerText = data.error;
-                }
+                } else { msg.className = "error"; msg.innerText = data.error; }
             } catch(e) { msg.className="error"; msg.innerText = "Ошибка обновления"; }
             finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
         };
@@ -732,14 +903,10 @@
             });
             const data = await res.json();
             if(res.ok) {
-                msg.className = "success";
-                msg.innerText = "Пароль успешно изменен!";
+                msg.className = "success"; msg.innerText = "Пароль изменен!";
                 document.getElementById('settings-old-pass').value = "";
                 document.getElementById('settings-new-pass').value = "";
-            } else {
-                msg.className = "error";
-                msg.innerText = data.error;
-            }
+            } else { msg.className = "error"; msg.innerText = data.error; }
         } catch(e) { msg.className="error"; msg.innerText = "Ошибка соединения"; }
         finally { toggleLoading(document.getElementById('save-password-btn'), false); }
     });
@@ -789,8 +956,7 @@
                 authError.style.color = '#6bff6b';
                 authError.innerText = "Успешная регистрация! Теперь войдите.";
             } else {
-                authError.style.color = '#ff6b6b';
-                authError.innerText = data.error;
+                authError.style.color = '#ff6b6b'; authError.innerText = data.error;
             }
         } catch (err) { authError.innerText = "Ошибка соединения"; } 
         finally { toggleLoading(document.getElementById('register-btn'), false); }
@@ -810,8 +976,14 @@
                 body: JSON.stringify({ username: u, password: p })
             });
             const data = await res.json();
-            if (res.ok) { initMessenger(data.username, data.avatarUrl); } 
-            else { authError.style.color = '#ff6b6b'; authError.innerText = data.error; }
+            if (res.ok) {
+                const saved = saveAccountToStorage(data.username, data.avatarUrl, data.token);
+                if (saved !== false) {
+                    initMessenger(data.username, data.avatarUrl, data.token);
+                }
+            } else {
+                authError.style.color = '#ff6b6b'; authError.innerText = data.error;
+            }
         } catch (err) { authError.innerText = "Ошибка соединения"; } 
         finally { toggleLoading(document.getElementById('login-btn'), false); }
     });
