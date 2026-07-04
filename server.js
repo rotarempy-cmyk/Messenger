@@ -15,16 +15,21 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
 const MONGODB_URI = process.env.MONGODB_URI;
-mongoose.connect(MONGODB_URI)
-    .then(() => console.log('Успешное подключение к MongoDB Atlas'))
-    .catch(err => console.error('Ошибка подключения к БД:', err));
+
+if (!MONGODB_URI) {
+    console.error('КРИТИЧЕСКАЯ ОШИБКА: Переменная окружения MONGODB_URI не задана в Secrets!');
+} else {
+    mongoose.connect(MONGODB_URI)
+        .then(() => console.log('Успешное подключение к MongoDB Atlas'))
+        .catch(err => console.error('Ошибка подключения к БД:', err));
+}
 
 // ================= СХЕМЫ БАЗЫ ДАННЫХ =================
 
 const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true },
     password: { type: String, required: true },
-    avatarUrl: { type: String, default: '' } // По умолчанию пусто, обработаем на фронте/при регистрации
+    avatarUrl: { type: String, default: '' }
 });
 const User = mongoose.model('GigaUser', UserSchema);
 
@@ -57,7 +62,6 @@ app.post('/api/register', async (req, res) => {
         if (!username || !password) return res.status(400).json({ error: 'Заполните все поля' });
         
         const hashedPassword = await bcrypt.hash(password, 10);
-        // Вместо внешних ссылок пишем маркер буквенной аватарки
         const defaultAvatar = `letter:${username}`;
         
         const newUser = new User({ username, password: hashedPassword, avatarUrl: defaultAvatar });
@@ -161,7 +165,6 @@ app.post('/api/chats', async (req, res) => {
     }
 });
 
-// --- СИСТЕМА ДРУЗЕЙ ---
 app.post('/api/friends/request', async (req, res) => {
     try {
         const { myUsername, targetUsername } = req.body;
@@ -249,8 +252,6 @@ app.post('/api/friends/list', async (req, res) => {
         res.status(500).json({ error: 'Ошибка получения списка друзей' });
     }
 });
-
-// --- НАСТРОЙКИ ПРОФИЛЯ ---
 
 app.post('/api/settings/update-avatar', async (req, res) => {
     try {

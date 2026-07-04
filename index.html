@@ -225,19 +225,26 @@
     const modalProfileFriendBtn = document.getElementById('modal-profile-friend-btn');
 
     const settingsModal = document.getElementById('settings-modal');
+    const chatTargetName = document.getElementById('chat-target-name');
 
-    // ГЕНЕРАЦИЯ БУКВЕННОЙ АВАТАРКИ НА СЕРОМ ФОНЕ
+    // Клик по имени в шапке открывает профиль собеседника
+    chatTargetName.style.cursor = 'pointer';
+    chatTargetName.addEventListener('click', () => {
+        const targetUser = chatTargetName.innerText;
+        if (targetUser) {
+            showUserProfile(targetUser);
+        }
+    });
+
     function generateLetterAvatar(username) {
         const canvas = document.createElement('canvas');
         canvas.width = 100;
         canvas.height = 100;
         const ctx = canvas.getContext('2d');
 
-        // Серый brutalist-фон
         ctx.fillStyle = '#4a4a4a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Первая буква верхнего регистра
         const firstLetter = username ? username.trim().charAt(0).toUpperCase() : '?';
         
         ctx.fillStyle = '#ffffff';
@@ -249,13 +256,10 @@
         return canvas.toDataURL();
     }
 
-    // ХЕЛПЕР ОПРЕДЕЛЕНИЯ ИСТОЧНИКА АВАТАРКИ
     function getAvatarSrc(avatarUrl, username) {
-        // Если это Base64-картинка (пользователь загрузил сам)
         if (avatarUrl && avatarUrl.startsWith('data:image')) {
             return avatarUrl;
         }
-        // Если это маркер буквы или старая ссылка на dicebear — отдаем сгенерированный Canvas
         return generateLetterAvatar(username);
     }
 
@@ -475,7 +479,9 @@
         activeChatId = chatId;
         chatPlaceholder.style.display = 'none';
         chatMain.style.display = 'flex';
-        document.getElementById('chat-target-name').innerText = targetUser;
+        
+        // Помещаем в шапку только чистый ник без лишнего текста
+        chatTargetName.innerText = targetUser;
         
         const hAvatar = document.getElementById('chat-header-avatar');
         hAvatar.src = avatarUrl;
