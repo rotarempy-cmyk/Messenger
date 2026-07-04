@@ -1,196 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIGA MESSENGER</title>
-    <style>
-        body { font-family: sans-serif; background: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        
-        #auth-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        #messenger-container { width: 950px; height: 650px; background: #333; border-radius: 8px; display: none; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-
-        .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        input { padding: 10px; border: none; border-radius: 4px; outline: none; background: #444; color: white; }
-        button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; justify-content: center; align-items: center; min-height: 38px; }
-        button:hover { background: #005999; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        .error { color: #ff6b6b; font-size: 14px; text-align: center; margin: 5px 0; }
-        .success { color: #6bff6b; font-size: 14px; text-align: center; margin: 5px 0; }
-
-        #sidebar { width: 320px; background: #2b2b2b; display: flex; flex-direction: column; border-right: 1px solid #444; position: relative; }
-        #chat-area { flex: 1; display: flex; flex-direction: column; background: #333; position: relative; }
-
-        #user-profile { padding: 15px; background: #222; font-weight: bold; border-bottom: 1px solid #444; font-size: 14px; color: #007acc; display: flex; align-items: center; gap: 10px; }
-        .my-avatar-mini { width: 32px; height: 32px; border-radius: 50%; background: #444; object-fit: cover; border: 1px solid #007acc; }
-
-        #search-box { padding: 10px; display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid #444; background: #262626; }
-        .search-row { display: flex; gap: 5px; }
-        #search-input { flex: 1; padding: 6px; font-size: 13px; }
-        #search-btn { min-height: 30px; padding: 5px 10px; font-size: 13px; }
-        
-        #search-result-panel { background: #333; border-radius: 4px; padding: 8px; display: none; flex-direction: column; gap: 8px; margin-top: 5px; border: 1px solid #555; }
-        .search-user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .search-user-info:hover span { text-decoration: underline; }
-        #search-result-name { font-size: 13px; font-weight: bold; }
-        .search-actions { display: flex; gap: 5px; }
-        .search-actions button { flex: 1; min-height: 28px; padding: 2px 5px; font-size: 12px; }
-        .add-friend-btn { background: #28a745; }
-        .add-friend-btn:hover { background: #218838; }
-        .chat-now-btn { background: #007acc; }
-
-        #tabs { display: flex; background: #222; border-bottom: 1px solid #444; }
-        .tab-btn { flex: 1; background: none; border: none; padding: 10px 0; color: #aaa; cursor: pointer; border-bottom: 2px solid transparent; border-radius: 0; min-height: auto; font-size: 13px; text-align: center; display: block; }
-        .tab-btn:hover { background: #2a2a2a; color: #fff; }
-        .tab-btn.active { color: #007acc; border-bottom: 2px solid #007acc; font-weight: bold; }
-        .badge { background: #ff3b30; color: white; border-radius: 10px; padding: 1px 6px; font-size: 10px; margin-left: 3px; font-weight: bold; display: none; }
-
-        #list-content { flex: 1; overflow-y: auto; margin-bottom: 50px; }
-        
-        .avatar-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #555; }
-        .list-item { padding: 10px 15px; border-bottom: 1px solid #3c3c3c; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .list-item:hover { background: #383838; }
-        .list-item.active { background: #007acc; color: white; }
-        .item-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-
-        #sidebar-footer { position: absolute; bottom: 0; left: 0; right: 0; height: 50px; background: #222; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 15px; justify-content: flex-end; }
-        .settings-trigger { background: none; border: none; padding: 5px; color: #aaa; font-size: 20px; min-height: auto; display: flex; align-items: center; justify-content: center; }
-        .settings-trigger:hover { color: #fff; background: none; }
-
-        #chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #777; font-size: 16px; }
-        #chat-main { flex: 1; display: none; flex-direction: column; height: 100%; }
-        #chat-header { padding: 15px; background: #2b2b2b; font-weight: bold; border-bottom: 1px solid #444; display: flex; align-items: center; gap: 10px; }
-        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        .msg { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; }
-        .msg.other { background: #444; align-self: flex-start; }
-        .msg.me { background: #007acc; align-self: flex-end; }
-        .msg-author { font-size: 11px; color: #aaa; margin-bottom: 3px; display: block; }
-        .msg.me .msg-author { color: #bce2ff; }
-
-        #input-area { display: flex; padding: 15px; background: #222; gap: 10px; }
-        #message-input { flex: 1; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: #333; padding: 25px; border-radius: 8px; width: 350px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; }
-        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 20px; color: #aaa; cursor: pointer; font-weight: bold; }
-        .close-modal:hover { color: #fff; }
-        
-        .profile-avatar-big { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #007acc; margin-bottom: 15px; background: #555; }
-        .profile-name { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
-        .modal-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; }
-        .modal-actions button { width: 100%; }
-
-        .settings-section { width: 100%; margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
-        .settings-section h4 { margin: 5px 0; color: #007acc; border-bottom: 1px solid #444; padding-bottom: 3px; }
-
-        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-</head>
-<body>
-
-<div id="auth-container">
-    <h2>Вход в GIGA MESSENGER</h2>
-    <div class="form-group">
-        <input type="text" id="username" placeholder="Имя пользователя">
-        <input type="password" id="password" placeholder="Пароль">
-    </div>
-    <button id="login-btn"><span class="btn-text">Войти</span></button>
-    <button id="register-btn" style="background: #444; margin-top: 5px;"><span class="btn-text">Регистрация</span></button>
-    <p id="auth-error" class="error"></p>
-</div>
-
-<div id="messenger-container">
-    <div id="sidebar">
-        <div id="user-profile">
-            <img src="" class="my-avatar-mini" id="my-avatar-img" alt="">
-            <span>Вы вошли как: <span id="my-name">...</span></span>
-        </div>
-        
-        <div id="search-box">
-            <div class="search-row">
-                <input type="text" id="search-input" placeholder="Введите точный ник..." autocomplete="off">
-                <button id="search-btn"><span class="btn-text">Найти</span></button>
-            </div>
-            <p id="search-error" class="error" style="font-size:12px; margin: 2px 0;"></p>
-            
-            <div id="search-result-panel">
-                <div class="search-user-info" id="search-profile-trigger">
-                    <img src="" class="avatar-mini" id="search-result-avatar" alt="">
-                    <span id="search-result-name">User</span>
-                </div>
-                <div class="search-actions">
-                    <button class="chat-now-btn" id="search-chat-btn"><span class="btn-text">Написать</span></button>
-                    <button class="add-friend-btn" id="add-friend-action-btn"><span class="btn-text">+ В друзья</span></button>
-                </div>
-            </div>
-        </div>
-
-        <div id="tabs">
-            <button class="tab-btn active" id="tab-chats">Чаты</button>
-            <button class="tab-btn" id="tab-friends">Друзья</button>
-            <button class="tab-btn" id="tab-requests">Заявки<span class="badge" id="requests-count">0</span></button>
-        </div>
-
-        <div id="list-content"></div>
-
-        <div id="sidebar-footer">
-            <button class="settings-trigger" id="open-settings-btn" title="Настройки">⚙️</button>
-        </div>
-    </div>
-
-    <div id="chat-area">
-        <div id="chat-placeholder">Выберите чат или найдите пользователя, чтобы начать общение</div>
-        
-        <div id="chat-main">
-            <div id="chat-header">
-                <img src="" class="avatar-mini" id="chat-header-avatar" alt="" style="display:none;">
-                <span>Чат с пользователем: <span id="chat-target-name">...</span></span>
-            </div>
-            <div id="messages"></div>
-            <div id="input-area">
-                <input type="text" id="message-input" placeholder="Введите сообщение..." autocomplete="off">
-                <button id="send-btn">Отправить</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="profile-modal">
-    <div class="modal-content">
-        <span class="close-modal" id="close-profile-modal">&times;</span>
-        <img src="" class="profile-avatar-big" id="modal-profile-avatar" alt="">
-        <div class="profile-name" id="modal-profile-name">User</div>
-        <div class="modal-actions">
-            <button id="modal-profile-chat-btn" class="chat-now-btn">Написать сообщение</button>
-            <button id="modal-profile-friend-btn" class="add-friend-btn">Добавить в друзья</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="settings-modal">
-    <div class="modal-content" style="width: 380px;">
-        <span class="close-modal" id="close-settings-modal">&times;</span>
-        <h3 style="margin-top:0; color:#007acc;">Настройки профиля</h3>
-        
-        <div class="settings-section">
-            <h4>Сменить аватарку</h4>
-            <input type="file" id="settings-avatar-file" accept="image/*" style="background: none; padding: 5px 0;">
-            <button id="save-avatar-btn" style="margin-top:5px; height:32px; min-height:auto;"><span class="btn-text">Загрузить картинку</span></button>
-            <p id="settings-avatar-msg" style="font-size:12px; margin:2px 0;" class="success"></p>
-        </div>
-
-        <div class="settings-section">
-            <h4>Изменить пароль</h4>
-            <input type="password" id="settings-old-pass" placeholder="Старый пароль">
-            <input type="password" id="settings-new-pass" placeholder="Новый пароль" style="margin-top:5px;">
-            <button id="save-password-btn" style="margin-top:5px; height:32px; min-height:auto; background:#444;"><span class="btn-text">Сохранить пароль</span></button>
-            <p id="settings-password-msg" style="font-size:12px; margin:2px 0;" class="error"></p>
-        </div>
-    </div>
-</div>
-
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
     const BACKEND_URL = "https://rotarempy-messenger.hf.space"; 
@@ -226,6 +33,39 @@
 
     const settingsModal = document.getElementById('settings-modal');
 
+    // ГЕНЕРАЦИЯ БУКВЕННОЙ АВАТАРКИ НА СЕРОМ ФОНЕ
+    function generateLetterAvatar(username) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 100;
+        canvas.height = 100;
+        const ctx = canvas.getContext('2d');
+
+        // Серый brutalist-фон
+        ctx.fillStyle = '#4a4a4a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Первая буква верхнего регистра
+        const firstLetter = username ? username.trim().charAt(0).toUpperCase() : '?';
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 50px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(firstLetter, 50, 52);
+
+        return canvas.toDataURL();
+    }
+
+    // ХЕЛПЕР ОПРЕДЕЛЕНИЯ ИСТОЧНИКА АВАТАРКИ
+    function getAvatarSrc(avatarUrl, username) {
+        // Если это Base64-картинка (пользователь загрузил сам)
+        if (avatarUrl && avatarUrl.startsWith('data:image')) {
+            return avatarUrl;
+        }
+        // Если это маркер буквы или старая ссылка на dicebear — отдаем сгенерированный Canvas
+        return generateLetterAvatar(username);
+    }
+
     function toggleLoading(button, isLoading) {
         const textSpan = button.querySelector('.btn-text');
         if (isLoading) {
@@ -248,7 +88,7 @@
         authContainer.style.display = 'none';
         messengerContainer.style.display = 'flex';
         document.getElementById('my-name').innerText = currentUser;
-        document.getElementById('my-avatar-img').src = currentUserAvatar;
+        document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
 
         socket = io(SOCKET_URL);
 
@@ -328,7 +168,7 @@
             const relData = await relRes.json();
 
             modalProfileName.innerText = profData.username;
-            modalProfileAvatar.src = profData.avatarUrl;
+            modalProfileAvatar.src = getAvatarSrc(profData.avatarUrl, profData.username);
             profileModal.style.display = 'flex';
 
             modalProfileChatBtn.onclick = () => {
@@ -392,7 +232,7 @@
             let newHTML = '';
             chats.forEach(chat => {
                 const name = chat.targetUser || "Неизвестный";
-                const avatar = chat.avatarUrl || "https://api.dicebear.com/7.x/identicon/svg";
+                const avatar = getAvatarSrc(chat.avatarUrl, name);
                 const isActive = chat._id === activeChatId ? 'active' : '';
                 
                 newHTML += `
@@ -434,7 +274,7 @@
             const pData = await pRes.json();
 
             switchTab('chats');
-            openChat(chatData._id, targetUser, pData.avatarUrl);
+            openChat(chatData._id, targetUser, getAvatarSrc(pData.avatarUrl, targetUser));
         } catch(e) {}
     }
 
@@ -473,10 +313,11 @@
             }
 
             friends.forEach(friend => {
+                const avatar = getAvatarSrc(friend.avatarUrl, friend.username);
                 newHTML += `
                     <div class="list-item" data-username="${friend.username}">
                         <div class="item-left">
-                            <img src="${friend.avatarUrl}" class="avatar-mini" alt="">
+                            <img src="${avatar}" class="avatar-mini" alt="">
                             <span>${friend.username}</span>
                         </div>
                         <button class="action-btn accept-btn" style="min-height:26px; font-size:11px;">Написать</button>
@@ -515,11 +356,12 @@
 
             listContent.innerHTML = '';
             requests.forEach(req => {
+                const avatar = getAvatarSrc(req.avatarUrl, req.sender);
                 const item = document.createElement('div');
                 item.classList.add('list-item');
                 item.innerHTML = `
                     <div class="item-left">
-                        <img src="${req.avatarUrl}" class="avatar-mini" alt="">
+                        <img src="${avatar}" class="avatar-mini" alt="">
                         <span><b>${req.sender}</b></span>
                     </div>
                     <div class="actions-group">
@@ -576,7 +418,7 @@
             }
 
             searchResultName.innerText = searchData.username;
-            searchResultAvatar.src = searchData.avatarUrl;
+            searchResultAvatar.src = getAvatarSrc(searchData.avatarUrl, searchData.username);
             searchResultPanel.style.display = 'flex';
 
             document.getElementById('search-profile-trigger').onclick = () => showUserProfile(searchData.username);
@@ -662,7 +504,7 @@
                 const data = await res.json();
                 if(res.ok) {
                     currentUserAvatar = data.avatarUrl;
-                    document.getElementById('my-avatar-img').src = currentUserAvatar;
+                    document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
                     msg.className = "success";
                     msg.innerText = "Аватарка успешно обновлена!";
                     if(currentTab === 'chats') loadMyChats();
@@ -775,5 +617,3 @@
         finally { toggleLoading(document.getElementById('login-btn'), false); }
     });
 </script>
-</body>
-</html>
