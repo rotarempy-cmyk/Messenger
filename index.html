@@ -6,34 +6,55 @@
     <title>GIGA MESSENGER</title>
     <style>
         body { font-family: sans-serif; background: #222; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #auth-container, #chat-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); padding: 20px; box-sizing: border-box; }
-        #chat-container { height: 500px; padding: 0; display: none; }
+        
+        /* Контейнеры экранов */
+        #auth-container { width: 400px; background: #333; border-radius: 8px; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #messenger-container { width: 900px; height: 600px; background: #333; border-radius: 8px; display: none; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+        /* Общие стили элементов */
         .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
         input { padding: 10px; border: none; border-radius: 4px; outline: none; background: #444; color: white; }
         button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; justify-content: center; align-items: center; min-height: 38px; }
         button:hover { background: #005999; }
         button:disabled { background: #555; cursor: not-allowed; }
+        .error { color: #ff6b6b; font-size: 14px; text-align: center; margin: 5px 0; }
+
+        /* Двухпанельный макет мессенджера */
+        #sidebar { width: 300px; background: #2b2b2b; display: flex; flex-direction: column; border-right: 1px solid #444; }
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: #333; position: relative; }
+
+        /* Боковая панель (Слева) */
+        #user-profile { padding: 15px; background: #222; font-weight: bold; border-bottom: 1px solid #444; font-size: 14px; color: #007acc; }
+        #search-box { padding: 10px; display: flex; gap: 5px; border-bottom: 1px solid #444; background: #262626; }
+        #search-input { flex: 1; padding: 6px; font-size: 13px; }
+        #search-btn { min-height: 30px; padding: 5px 10px; font-size: 13px; }
+        #chats-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        /* Элемент списка чатов */
+        .chat-item { padding: 15px; border-bottom: 1px solid #3c3c3c; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; }
+        .chat-item:hover { background: #383838; }
+        .chat-item.active { background: #007acc; color: white; }
+
+        /* Окно чата (Справа) */
+        #chat-placeholder { flex: 1; display: flex; justify-content: center; align-items: center; color: #777; font-size: 16px; }
+        #chat-main { flex: 1; display: none; flex-direction: column; height: 100%; }
+        #chat-header { padding: 15px; background: #2b2b2b; font-weight: bold; border-bottom: 1px solid #444; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Сообщения */
         .msg { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; }
         .msg.other { background: #444; align-self: flex-start; }
         .msg.me { background: #007acc; align-self: flex-end; }
-        #input-area { display: flex; padding: 10px; background: #222; }
-        #message-input { flex: 1; }
-        #send-btn { margin-left: 5px; }
-        .error { color: #ff6b6b; font-size: 14px; text-align: center; }
+        .msg-author { font-size: 11px; color: #aaa; margin-bottom: 3px; display: block; }
+        .msg.me .msg-author { color: #bce2ff; }
 
-        /* Стиль крутящегося значка загрузки (Спиннера) */
-        .spinner {
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        /* Область ввода сообщения */
+        #input-area { display: flex; padding: 15px; background: #222; gap: 10px; }
+        #message-input { flex: 1; }
+
+        /* Спиннер загрузки */
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -49,103 +70,237 @@
     <p id="auth-error" class="error"></p>
 </div>
 
-<div id="chat-container">
-    <div id="messages"></div>
-    <div id="input-area">
-        <input type="text" id="message-input" placeholder="Введите сообщение..." autocomplete="off">
-        <button id="send-btn">Отправить</button>
+<div id="messenger-container">
+    <div id="sidebar">
+        <div id="user-profile">Вы вошли как: <span id="my-name">...</span></div>
+        <div id="search-box">
+            <input type="text" id="search-input" placeholder="Введите точный ник..." autocomplete="off">
+            <button id="search-btn"><span class="btn-text">Найти</span></button>
+        </div>
+        <p id="search-error" class="error" style="font-size:12px;"></p>
+        <div id="chats-list">
+            </div>
+    </div>
+
+    <div id="chat-area">
+        <div id="chat-placeholder">Выберите чат или найдите пользователя, чтобы начать общение</div>
+        
+        <div id="chat-main">
+            <div id="chat-header">Чат с пользователем: <span id="chat-target-name">...</span></div>
+            <div id="messages"></div>
+            <div id="input-area">
+                <input type="text" id="message-input" placeholder="Введите сообщение..." autocomplete="off">
+                <button id="send-btn">Отправить</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-    // Ссылки на адреса твоего Hugging Face
     const BACKEND_URL = "https://rotarempy-messenger.hf.space"; 
     const SOCKET_URL = "wss://rotarempy-messenger.hf.space";
 
     let currentUser = null;
+    let activeChatId = null;
     let socket = null;
 
+    // Элементы интерфейса
     const authContainer = document.getElementById('auth-container');
-    const chatContainer = document.getElementById('chat-container');
+    const messengerContainer = document.getElementById('messenger-container');
     const authError = document.getElementById('auth-error');
-    
-    const loginBtn = document.getElementById('login-btn');
-    const registerBtn = document.getElementById('register-btn');
+    const searchError = document.getElementById('search-error');
+    const chatsList = document.getElementById('chats-list');
+    const chatPlaceholder = document.getElementById('chat-placeholder');
+    const chatMain = document.getElementById('chat-main');
+    const messagesContainer = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
 
-    // Функция включения/выключения режима загрузки на кнопке
-    function toggleLoading(button, isLoading, originalText) {
+    function toggleLoading(button, isLoading) {
         const textSpan = button.querySelector('.btn-text');
         if (isLoading) {
             button.disabled = true;
-            textSpan.style.display = 'none';
-            // Добавляем спиннер внутрь кнопки
+            if(textSpan) textSpan.style.display = 'none';
             const spinner = document.createElement('div');
             spinner.classList.add('spinner');
             button.appendChild(spinner);
         } else {
             button.disabled = false;
-            textSpan.style.display = 'inline';
-            // Удаляем спиннер
+            if(textSpan) textSpan.style.display = 'inline';
             const spinner = button.querySelector('.spinner');
             if (spinner) spinner.remove();
         }
     }
 
-    function startChat(username) {
+    // Инициализация мессенджера после логина
+    function initMessenger(username) {
         currentUser = username;
         authContainer.style.display = 'none';
-        chatContainer.style.display = 'flex';
+        messengerContainer.style.display = 'flex';
+        document.getElementById('my-name').innerText = currentUser;
 
+        // Подключаем сокеты
         socket = io(SOCKET_URL);
 
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-
-        function sendMessage() {
-            const text = messageInput.value.trim();
-            if (text !== '') {
-                socket.emit('send_message', { sender: currentUser, text: text });
-                messageInput.value = '';
-            }
-        }
-
-        sendBtn.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-
+        // Получение истории сообщений при входе в чат комнатку
         socket.on('load_history', (messages) => {
             messagesContainer.innerHTML = '';
             messages.forEach(msg => appendMessage(msg));
         });
 
-        socket.on('receive_message', (data) => {
-            appendMessage(data);
+        // Получение нового сообщения в реальном времени
+        socket.on('receive_message', (msgData) => {
+            // Отображаем сообщение только если оно принадлежит открытому чату
+            if (msgData.chatId === activeChatId) {
+                appendMessage(msgData);
+            }
         });
 
-        function appendMessage(data) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('msg');
-            if (data.sender === currentUser) {
-                messageElement.classList.add('me');
-                messageElement.innerText = data.text;
-            } else {
-                messageElement.classList.add('other');
-                messageElement.innerText = `${data.sender}: ${data.text}`;
-            }
-            messagesContainer.appendChild(messageElement);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Загружаем список чатов пользователя с сервера
+        loadMyChats();
+    }
+
+    // Загрузка списка чатов с сервера
+    async function loadMyChats() {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/chats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ myUsername: currentUser })
+            });
+            const chats = await res.json();
+            renderChatsList(chats);
+        } catch (err) {
+            console.error("Ошибка загрузки списка чатов:", err);
         }
     }
 
-    // Регистрация
-    registerBtn.addEventListener('click', async () => {
+    // Отображение списка чатов на панели слева
+    function renderChatsList(chats) {
+        chatsList.innerHTML = '';
+        if(chats.length === 0) {
+            chatsList.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет чатов</div>';
+            return;
+        }
+
+        chats.forEach(chat => {
+            // Находим имя собеседника (тот, кто не я)
+            const targetUser = chat.participants.find(p => p !== currentUser) || currentUser;
+            
+            const chatItem = document.createElement('div');
+            chatItem.classList.add('chat-item');
+            if (chat._id === activeChatId) chatItem.classList.add('active');
+            chatItem.innerText = targetUser;
+            
+            // Клик по чату — открываем переписку
+            chatItem.addEventListener('click', () => openChat(chat._id, targetUser));
+            chatsList.appendChild(chatItem);
+        });
+    }
+
+    // Открытие конкретного чата
+    function openChat(chatId, targetUser) {
+        activeChatId = chatId;
+        chatPlaceholder.style.display = 'none';
+        chatMain.style.display = 'flex';
+        document.getElementById('chat-target-name').innerText = targetUser;
+
+        // Выделяем активный чат в списке слева
+        document.querySelectorAll('.chat-item').forEach(item => {
+            item.classList.remove('active');
+            if(item.innerText === targetUser) item.classList.add('active');
+        });
+
+        // Говорим серверу через веб-сокет, что мы зашли в эту комнату чата
+        socket.emit('join_chat', { chatId: chatId });
+    }
+
+    // Отправка сообщения
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (text !== '' && activeChatId && currentUser) {
+            socket.emit('send_message', { 
+                chatId: activeChatId, 
+                sender: currentUser, 
+                text: text 
+            });
+            messageInput.value = '';
+        }
+    }
+
+    document.getElementById('send-btn').addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    function appendMessage(msgData) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('msg');
+        
+        if (msgData.sender === currentUser) {
+            messageElement.classList.add('me');
+        } else {
+            messageElement.classList.add('other');
+        }
+
+        messageElement.innerHTML = `<span class="msg-author">${msgData.sender}</span>${msgData.text}`;
+        messagesContainer.appendChild(messageElement);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Поиск пользователя и создание/открытие чата с ним
+    document.getElementById('search-btn').addEventListener('click', async () => {
+        const targetInput = document.getElementById('search-input');
+        const targetUsername = targetInput.value.trim();
+        searchError.innerText = "";
+
+        if(!targetUsername) return;
+        if(targetUsername === currentUser) {
+            return searchError.innerText = "Нельзя создать чат с самим собой!";
+        }
+
+        toggleLoading(document.getElementById('search-btn'), true);
+
+        try {
+            // 1. Ищем пользователя в БД по точному нику
+            const searchRes = await fetch(`${BACKEND_URL}/api/search-users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: targetUsername })
+            });
+            const searchData = await searchRes.json();
+
+            if (!searchRes.ok) {
+                searchError.innerText = searchData.error || "Пользователь не найден";
+                return;
+            }
+
+            // 2. Если пользователь найден, запрашиваем или создаем чат с ним
+            const chatRes = await fetch(`${BACKEND_URL}/api/chats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ myUsername: currentUser, targetUsername: searchData.username })
+            });
+            const chatData = await chatRes.json();
+
+            targetInput.value = "";
+            // Обновляем список чатов на панели
+            await loadMyChats();
+            // Сразу открываем этот чат
+            openChat(chatData._id, searchData.username);
+
+        } catch (err) {
+            searchError.innerText = "Ошибка сети при поиске";
+        } finally {
+            toggleLoading(document.getElementById('search-btn'), false);
+        }
+    });
+
+    // Обычная Логика Авторизации (Вход и Регистрация)
+    document.getElementById('register-btn').addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
         if(!u || !p) return authError.innerText = "Заполните поля!";
-
         authError.innerText = "";
-        toggleLoading(registerBtn, true); // Включаем спиннер
+        toggleLoading(document.getElementById('register-btn'), true);
 
         try {
             const res = await fetch(`${BACKEND_URL}/api/register`, {
@@ -162,21 +317,18 @@
                 authError.innerText = data.error;
             }
         } catch (err) {
-            authError.style.color = '#ff6b6b';
-            authError.innerText = "Ошибка соединения с сервером";
+            authError.innerText = "Ошибка соединения";
         } finally {
-            toggleLoading(registerBtn, false); // Выключаем спиннер
+            toggleLoading(document.getElementById('register-btn'), false);
         }
     });
 
-    // Вход
-    loginBtn.addEventListener('click', async () => {
+    document.getElementById('login-btn').addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
         if(!u || !p) return authError.innerText = "Заполните поля!";
-
         authError.innerText = "";
-        toggleLoading(loginBtn, true); // Включаем спиннер
+        toggleLoading(document.getElementById('login-btn'), true);
 
         try {
             const res = await fetch(`${BACKEND_URL}/api/login`, {
@@ -186,16 +338,15 @@
             });
             const data = await res.json();
             if (res.ok) {
-                startChat(data.username);
+                initMessenger(data.username);
             } else {
                 authError.style.color = '#ff6b6b';
                 authError.innerText = data.error;
             }
         } catch (err) {
-            authError.style.color = '#ff6b6b';
-            authError.innerText = "Ошибка соединения с сервером";
+            authError.innerText = "Ошибка соединения";
         } finally {
-            toggleLoading(loginBtn, false); // Выключаем спиннер в случае неудачи
+            toggleLoading(document.getElementById('login-btn'), false);
         }
     });
 </script>
