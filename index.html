@@ -301,6 +301,20 @@
         let contextTargetChatId = null;
         let currentGroupData = null; // Для хранения текущей группы в настройках
 
+        // Кэш последних загруженных списков — при переключении вкладок
+        // показываем их МГНОВЕННО, а свежие данные подтягиваем в фоне.
+        const listCache = { chats: null, friends: null, requests: null };
+
+        // Очередь локально отправленных (ещё не подтверждённых сервером)
+        // сообщений — нужна для оптимистичного рендера без дублей.
+        const pendingSentMessages = [];
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : String(str);
+            return div.innerHTML;
+        }
+
         const authContainer = document.getElementById('auth-container');
         const messengerContainer = document.getElementById('messenger-container');
         const authError = document.getElementById('auth-error');
@@ -434,15 +448,35 @@
             document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
 
             if (socket) socket.disconnect();
-            socket = io(SOCKET_URL);
+            // Токен передаём при подключении — сервер отклонит соединение
+            // без валидной сессии, поэтому чужой браузер не сможет слать
+            // сообщения от имени этого аккаунта.
+            socket = io(SOCKET_URL, { auth: { token: currentUserToken } });
 
-            socket.on('load_history', (messages) => {
+            socket.on('load_history', ({ chatId, messages }) => {
+                if (chatId !== activeChatId) return; // на случай гонки при быстром переключении чатов
                 messagesContainer.innerHTML = '';
+                pendingSentMessages.length = 0;
                 messages.forEach(msg => appendMessage(msg));
             });
 
             socket.on('receive_message', (msgData) => {
-                if (msgData.chatId === activeChatId) appendMessage(msgData);
+                if (msgData.chatId !== activeChatId) return;
+
+                // Если это подтверждение НАШЕГО же оптимистично отправленного
+                // сообщения — не дублируем, а просто "подтверждаем" уже нарисованное.
+                if (msgData.sender === currentUser && pendingSentMessages.length > 0
+                    && pendingSentMessages[0].text === msgData.text) {
+                    const pending = pendingSentMessages.shift();
+                    pending.element.style.opacity = '1';
+                    pending.element.dataset.confirmed = 'true';
+                    return;
+                }
+                appendMessage(msgData);
+            });
+
+            socket.on('chat_error', ({ error }) => {
+                console.warn('Ошибка чата:', error);
             });
 
             switchTab('chats');
@@ -451,13 +485,28 @@
 
         function startUpdateLoop() {
             if (window.gigaInterval) clearInterval(window.gigaInterval);
+            // Основные обновления теперь приходят мгновенно через сокет
+            // (см. friend_request_incoming / friend_request_accepted ниже).
+            // Этот интервал — просто подстраховка на случай разрыва соединения,
+            // поэтому его можно держать редким и не грузить бесплатный сервер.
             window.gigaInterval = setInterval(() => {
                 updateBadges();
                 if(currentTab === 'requests') loadIncomingRequests();
                 if(currentTab === 'friends') loadFriendsList();
                 if(currentTab === 'chats') loadMyChats();
-            }, 4000);
+            }, 20000);
             updateBadges();
+
+            if (socket) {
+                socket.on('friend_request_incoming', () => {
+                    updateBadges();
+                    if (currentTab === 'requests') loadIncomingRequests();
+                });
+                socket.on('friend_request_accepted', () => {
+                    if (currentTab === 'friends') loadFriendsList();
+                    if (currentTab === 'chats') loadMyChats();
+                });
+            }
         }
 
         async function updateBadges() {
@@ -481,9 +530,17 @@
             searchResultPanel.style.display = 'none';
             searchError.innerText = "";
 
+            if (listCache[tabName]) renderListFromCache(tabName);
+
             if(tabName === 'chats') loadMyChats();
             if(tabName === 'friends') loadFriendsList();
             if(tabName === 'requests') loadIncomingRequests();
+        }
+
+        function renderListFromCache(tabName) {
+            if (tabName === 'chats') renderChats(listCache.chats);
+            if (tabName === 'friends') renderFriends(listCache.friends);
+            if (tabName === 'requests') renderRequests(listCache.requests);
         }
 
         document.getElementById('tab-chats').addEventListener('click', () => switchTab('chats'));
@@ -790,48 +847,56 @@
                 });
                 if(!res.ok) return;
                 const chats = await res.json();
-                
-                if(!chats || chats.length === 0) {
-                    listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
-                    return;
-                }
-
-                listContent.innerHTML = '';
-                chats.forEach(chat => {
-                    const isGroup = chat.isGroup === true;
-                    const name = isGroup ? chat.groupName : (chat.targetUser || "Неизвестный");
-                    const avatar = getAvatarSrc(isGroup ? chat.groupAvatar : chat.avatarUrl, name);
-                    const isActive = chat._id === activeChatId ? 'active' : '';
-                    
-                    const item = document.createElement('div');
-                    item.className = `list-item ${isActive}`;
-                    item.setAttribute('data-chat-id', chat._id);
-                    item.setAttribute('data-name', name);
-                    item.setAttribute('data-avatar', avatar);
-                    item.setAttribute('data-is-group', isGroup ? 'true' : 'false');
-
-                    item.innerHTML = `
-                        <div class="item-left">
-                            <img src="${avatar}" class="avatar-mini" alt="">
-                            <span>${name}${isGroup ? ' 👥' : ''}</span>
-                        </div>
-                    `;
-
-                    // ПКМ на элементе чата/группы
-                    item.addEventListener('contextmenu', (e) => {
-                        if (isGroup) {
-                            e.preventDefault();
-                            contextTargetChatId = chat._id;
-                            contextMenu.style.left = e.pageX + 'px';
-                            contextMenu.style.top = e.pageY + 'px';
-                            contextMenu.style.display = 'block';
-                        }
-                    });
-
-                    item.addEventListener('click', () => openChat(chat._id, name, avatar, isGroup));
-                    listContent.appendChild(item);
-                });
+                listCache.chats = chats;
+                if (currentTab === 'chats') renderChats(chats);
             } catch (err) {}
+        }
+
+        function renderChats(chats) {
+            if(!chats || chats.length === 0) {
+                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">У вас пока нет активных чатов</div>';
+                return;
+            }
+
+            listContent.innerHTML = '';
+            chats.forEach(chat => {
+                const isGroup = chat.isGroup === true;
+                const name = isGroup ? chat.groupName : (chat.targetUser || "Неизвестный");
+                const avatar = getAvatarSrc(isGroup ? chat.groupAvatar : chat.avatarUrl, name);
+                const isActive = chat._id === activeChatId ? 'active' : '';
+
+                const item = document.createElement('div');
+                item.className = `list-item ${isActive}`;
+                item.setAttribute('data-chat-id', chat._id);
+
+                const left = document.createElement('div');
+                left.className = 'item-left';
+                const img = document.createElement('img');
+                img.src = avatar; img.className = 'avatar-mini'; img.alt = '';
+                const span = document.createElement('span');
+                span.textContent = name + (isGroup ? ' 👥' : ''); // textContent — защита от XSS в имени
+                left.appendChild(img); left.appendChild(span);
+                item.appendChild(left);
+
+                item.addEventListener('contextmenu', (e) => {
+                    if (isGroup) {
+                        e.preventDefault();
+                        contextTargetChatId = chat._id;
+                        contextMenu.style.left = e.pageX + 'px';
+                        contextMenu.style.top = e.pageY + 'px';
+                        contextMenu.style.display = 'block';
+                    }
+                });
+
+                item.addEventListener('click', () => {
+                    // Подсветку меняем СРАЗУ, не дожидаясь сети — раньше она
+                    // обновлялась только при следующей перерисовке списка (до 4 сек).
+                    document.querySelectorAll('#list-content .list-item.active').forEach(el => el.classList.remove('active'));
+                    item.classList.add('active');
+                    openChat(chat._id, name, avatar, isGroup);
+                });
+                listContent.appendChild(item);
+            });
         }
 
         async function startChatWithUser(targetUser) {
@@ -859,7 +924,13 @@
             chatPlaceholder.style.display = 'none';
             chatMain.style.display = 'flex';
             chatTargetName.innerText = title;
-            
+
+            // Чистим окно сообщений сразу же — раньше старая переписка
+            // оставалась на экране, пока не придёт история нового чата,
+            // из-за чего переключение выглядело "подвисшим".
+            messagesContainer.innerHTML = '<div style="text-align:center; color:#444; font-size:12px; padding:20px;">Загрузка сообщений...</div>';
+            pendingSentMessages.length = 0;
+
             const hAvatar = document.getElementById('chat-header-avatar');
             hAvatar.src = avatarUrl;
             hAvatar.style.display = 'inline-block';
@@ -890,32 +961,41 @@
                     headers: { 'Authorization': `Bearer ${currentUserToken}` }
                 });
                 const friends = await res.json();
-
-                if(friends.length === 0) {
-                    listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Список друзей пока пуст</div>';
-                    return;
-                }
-
-                listContent.innerHTML = '';
-                friends.forEach(friend => {
-                    const avatar = getAvatarSrc(friend.avatarUrl, friend.username);
-                    const item = document.createElement('div');
-                    item.className = 'list-item';
-                    item.innerHTML = `
-                        <div class="item-left">
-                            <img src="${avatar}" class="avatar-mini" alt="">
-                            <span>${friend.username}</span>
-                        </div>
-                        <button class="action-btn accept-btn" style="min-height:26px; font-size:11px;">Написать</button>
-                    `;
-                    item.addEventListener('click', () => showUserProfile(friend.username));
-                    item.querySelector('button').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        startChatWithUser(friend.username);
-                    });
-                    listContent.appendChild(item);
-                });
+                listCache.friends = friends;
+                if (currentTab === 'friends') renderFriends(friends);
             } catch(e){}
+        }
+
+        function renderFriends(friends) {
+            if(!friends || friends.length === 0) {
+                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Список друзей пока пуст</div>';
+                return;
+            }
+
+            listContent.innerHTML = '';
+            friends.forEach(friend => {
+                const avatar = getAvatarSrc(friend.avatarUrl, friend.username);
+                const item = document.createElement('div');
+                item.className = 'list-item';
+
+                const left = document.createElement('div');
+                left.className = 'item-left';
+                const img = document.createElement('img');
+                img.src = avatar; img.className = 'avatar-mini'; img.alt = '';
+                const span = document.createElement('span');
+                span.textContent = friend.username;
+                left.appendChild(img); left.appendChild(span);
+
+                const btn = document.createElement('button');
+                btn.className = 'action-btn accept-btn';
+                btn.style.cssText = 'min-height:26px; font-size:11px;';
+                btn.textContent = 'Написать';
+
+                item.appendChild(left); item.appendChild(btn);
+                item.addEventListener('click', () => showUserProfile(friend.username));
+                btn.addEventListener('click', (e) => { e.stopPropagation(); startChatWithUser(friend.username); });
+                listContent.appendChild(item);
+            });
         }
 
         async function loadIncomingRequests() {
@@ -926,34 +1006,47 @@
                     headers: { 'Authorization': `Bearer ${currentUserToken}` }
                 });
                 const requests = await res.json();
-
-                if(requests.length === 0) {
-                    listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Нет входящих заявок</div>';
-                    return;
-                }
-
-                listContent.innerHTML = '';
-                requests.forEach(req => {
-                    const avatar = getAvatarSrc(req.avatarUrl, req.sender);
-                    const item = document.createElement('div');
-                    item.classList.add('list-item');
-                    item.innerHTML = `
-                        <div class="item-left">
-                            <img src="${avatar}" class="avatar-mini" alt="">
-                            <span><b>${req.sender}</b></span>
-                        </div>
-                        <div class="actions-group">
-                            <button class="action-btn accept-btn" id="acc-${req._id}">Принять</button>
-                            <button class="action-btn reject-btn" id="rej-${req._id}">Отклонить</button>
-                        </div>
-                    `;
-                    item.addEventListener('click', () => showUserProfile(req.sender));
-                    listContent.appendChild(item);
-
-                    document.getElementById(`acc-${req._id}`).addEventListener('click', (e) => { e.stopPropagation(); respondFriendRequest(req._id, 'accept'); });
-                    document.getElementById(`rej-${req._id}`).addEventListener('click', (e) => { e.stopPropagation(); respondFriendRequest(req._id, 'reject'); });
-                });
+                listCache.requests = requests;
+                if (currentTab === 'requests') renderRequests(requests);
             } catch(e){}
+        }
+
+        function renderRequests(requests) {
+            if(!requests || requests.length === 0) {
+                listContent.innerHTML = '<div style="padding:15px; color:#666; font-size:13px; text-align:center;">Нет входящих заявок</div>';
+                return;
+            }
+
+            listContent.innerHTML = '';
+            requests.forEach(req => {
+                const avatar = getAvatarSrc(req.avatarUrl, req.sender);
+                const item = document.createElement('div');
+                item.classList.add('list-item');
+
+                const left = document.createElement('div');
+                left.className = 'item-left';
+                const img = document.createElement('img');
+                img.src = avatar; img.className = 'avatar-mini'; img.alt = '';
+                const span = document.createElement('span');
+                const b = document.createElement('b');
+                b.textContent = req.sender;
+                span.appendChild(b);
+                left.appendChild(img); left.appendChild(span);
+
+                const actions = document.createElement('div');
+                actions.className = 'actions-group';
+                const accBtn = document.createElement('button');
+                accBtn.className = 'action-btn accept-btn'; accBtn.textContent = 'Принять';
+                const rejBtn = document.createElement('button');
+                rejBtn.className = 'action-btn reject-btn'; rejBtn.textContent = 'Отклонить';
+                actions.appendChild(accBtn); actions.appendChild(rejBtn);
+
+                item.appendChild(left); item.appendChild(actions);
+                item.addEventListener('click', () => showUserProfile(req.sender));
+                accBtn.addEventListener('click', (e) => { e.stopPropagation(); respondFriendRequest(req._id, 'accept'); });
+                rejBtn.addEventListener('click', (e) => { e.stopPropagation(); respondFriendRequest(req._id, 'reject'); });
+                listContent.appendChild(item);
+            });
         }
 
         async function respondFriendRequest(requestId, action) {
@@ -1201,21 +1294,39 @@
         function sendMessage() {
             const text = messageInput.value.trim();
             if (text !== '' && activeChatId && currentUser) {
-                socket.emit('send_message', { chatId: activeChatId, sender: currentUser, text: text });
+                // Сервер сам подставит sender из авторизованного сокета —
+                // отправлять его с клиента больше не нужно (и небезопасно).
+                socket.emit('send_message', { chatId: activeChatId, text: text });
                 messageInput.value = '';
+
+                // Оптимистичный рендер: не ждём ответа сервера, чтобы
+                // отправка ощущалась мгновенной.
+                const el = appendMessage({ sender: currentUser, text }, { pending: true });
+                pendingSentMessages.push({ text, element: el });
             }
         }
 
         document.getElementById('send-btn').addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-        function appendMessage(msgData) {
+        function appendMessage(msgData, options = {}) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('msg');
             messageElement.classList.add(msgData.sender === currentUser ? 'me' : 'other');
-            messageElement.innerHTML = `<span class="msg-author">${msgData.sender}</span>${msgData.text}`;
+
+            const authorSpan = document.createElement('span');
+            authorSpan.className = 'msg-author';
+            authorSpan.textContent = msgData.sender;
+            messageElement.appendChild(authorSpan);
+            // textContent, а не innerHTML — иначе сообщение с HTML/скриптом
+            // внутри выполнится у получателя (хранимый XSS).
+            messageElement.appendChild(document.createTextNode(msgData.text));
+
+            if (options.pending) messageElement.style.opacity = '0.55';
+
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return messageElement;
         }
 
         // Закрытие модалок по кнопкам
