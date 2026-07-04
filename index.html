@@ -9,7 +9,7 @@
         body { background-color: #0a0a0a; color: #e0e0e0; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         
         /* Авторизация */
-        #auth-container { display: flex; flex-direction: column; width: 320px; background: #111; padding: 25px; border: 1px solid #222; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        #auth-container { display: none; flex-direction: column; width: 320px; background: #111; padding: 25px; border: 1px solid #222; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         .auth-title { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 20px; letter-spacing: 1px; color: #fff; text-transform: uppercase; }
         .input-field { width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #333; color: #fff; margin-bottom: 15px; font-size: 14px; }
         .input-field:focus { border-color: #555; outline: none; }
@@ -77,7 +77,7 @@
         #send-btn { background: #fff; color: #000; padding: 0 20px; font-weight: bold; border: none; cursor: pointer; }
 
         /* Модальные окна */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #111; border: 1px solid #333; width: 360px; padding: 20px; display: flex; flex-direction: column; max-height: 90vh; overflow-y: auto; }
         .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; color: #fff; }
         .modal-close-btn { background: #222; color: #fff; border: 1px solid #333; padding: 8px; margin-top: 15px; cursor: pointer; font-weight: bold; text-align: center; }
@@ -96,6 +96,10 @@
     </style>
 </head>
 <body>
+
+    <!-- Показывается, пока проверяем сохранённую сессию - убирает "мигание" -->
+    <!-- окна входа перед автоматическим перебросом в мессенджер -->
+    <div id="initial-loader" style="display:flex; width:32px; height:32px; border:3px solid rgba(255,255,255,0.15); border-top-color:#fff; border-radius:50%; animation: spin 0.6s linear infinite;"></div>
 
     <!-- ОКНО АВТОРИЗАЦИИ -->
     <div id="auth-container">
@@ -301,9 +305,31 @@
         let contextTargetChatId = null;
         let currentGroupData = null; // Для хранения текущей группы в настройках
 
-        // Кэш последних загруженных списков — при переключении вкладок
-        // показываем их МГНОВЕННО, а свежие данные подтягиваем в фоне.
+        // Кэш последних загруженных списков — при переключении вкладок и даже
+        // после перезагрузки страницы показываем их МГНОВЕННО из localStorage,
+        // а свежие данные подтягиваем в фоне и обновляем и кэш, и экран.
         const listCache = { chats: null, friends: null, requests: null };
+
+        function cacheStorageKey(tabName) {
+            return `giga_cache_${tabName}_${currentUser}`;
+        }
+
+        function saveListCache(tabName, data) {
+            listCache[tabName] = data;
+            try {
+                localStorage.setItem(cacheStorageKey(tabName), JSON.stringify(data));
+            } catch (e) {
+                // localStorage переполнен (например, слишком много крупных аватаров) -
+                // не критично, просто не кэшируем на этот раз.
+            }
+        }
+
+        function loadListCacheFromStorage(tabName) {
+            try {
+                const raw = localStorage.getItem(cacheStorageKey(tabName));
+                if (raw) listCache[tabName] = JSON.parse(raw);
+            } catch (e) {}
+        }
 
         // Очередь локально отправленных (ещё не подтверждённых сервером)
         // сообщений — нужна для оптимистичного рендера без дублей.
@@ -354,6 +380,7 @@
         // ================= АВТОРИЗАЦИЯ И СЕССИИ =================
 
         window.addEventListener('DOMContentLoaded', async () => {
+            const initialLoader = document.getElementById('initial-loader');
             const accounts = getSavedAccounts();
             const activeUser = localStorage.getItem('giga_active_user');
             
@@ -361,11 +388,13 @@
                 const verified = await verifySession(accounts[activeUser].token);
                 if (verified) {
                     initMessenger(verified.username, verified.avatarUrl, verified.token);
+                    initialLoader.style.display = 'none';
                     return;
                 } else {
                     removeAccountFromStorage(activeUser);
                 }
             }
+            initialLoader.style.display = 'none';
             authContainer.style.display = 'flex';
             messengerContainer.style.display = 'none';
         });
@@ -446,6 +475,13 @@
             messengerContainer.style.display = 'flex';
             document.getElementById('my-name').innerText = currentUser;
             document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
+
+            // Подтягиваем то, что уже сохранено с прошлого визита (в т.ч. после
+            // перезагрузки страницы), чтобы список чатов был виден мгновенно,
+            // ещё до ответа сервера.
+            loadListCacheFromStorage('chats');
+            loadListCacheFromStorage('friends');
+            loadListCacheFromStorage('requests');
 
             if (socket) socket.disconnect();
             // Токен передаём при подключении — сервер отклонит соединение
@@ -847,7 +883,7 @@
                 });
                 if(!res.ok) return;
                 const chats = await res.json();
-                listCache.chats = chats;
+                saveListCache('chats', chats);
                 if (currentTab === 'chats') renderChats(chats);
             } catch (err) {}
         }
@@ -961,7 +997,7 @@
                     headers: { 'Authorization': `Bearer ${currentUserToken}` }
                 });
                 const friends = await res.json();
-                listCache.friends = friends;
+                saveListCache('friends', friends);
                 if (currentTab === 'friends') renderFriends(friends);
             } catch(e){}
         }
@@ -1006,7 +1042,7 @@
                     headers: { 'Authorization': `Bearer ${currentUserToken}` }
                 });
                 const requests = await res.json();
-                listCache.requests = requests;
+                saveListCache('requests', requests);
                 if (currentTab === 'requests') renderRequests(requests);
             } catch(e){}
         }
@@ -1334,6 +1370,13 @@
         document.getElementById('close-settings-modal').onclick = () => settingsModal.style.display = 'none';
         document.getElementById('close-group-wizard-btn').onclick = () => groupWizardModal.style.display = 'none';
         document.getElementById('close-group-settings-btn').onclick = () => groupSettingsModal.style.display = 'none';
+
+        // Клик по затемнённому фону (за пределами белого окна) закрывает модалку
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.style.display = 'none';
+            });
+        });
 
         // ================= ВХОД / РЕГИСТРАЦИЯ =================
 
