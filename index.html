@@ -10,8 +10,9 @@
         #chat-container { height: 500px; padding: 0; display: none; }
         .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
         input { padding: 10px; border: none; border-radius: 4px; outline: none; background: #444; color: white; }
-        button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button { background: #007acc; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; justify-content: center; align-items: center; min-height: 38px; }
         button:hover { background: #005999; }
+        button:disabled { background: #555; cursor: not-allowed; }
         #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         .msg { padding: 8px 12px; border-radius: 15px; max-width: 70%; word-break: break-word; }
         .msg.other { background: #444; align-self: flex-start; }
@@ -20,6 +21,19 @@
         #message-input { flex: 1; }
         #send-btn { margin-left: 5px; }
         .error { color: #ff6b6b; font-size: 14px; text-align: center; }
+
+        /* Стиль крутящегося значка загрузки (Спиннера) */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -30,8 +44,8 @@
         <input type="text" id="username" placeholder="Имя пользователя">
         <input type="password" id="password" placeholder="Пароль">
     </div>
-    <button id="login-btn">Войти</button>
-    <button id="register-btn" style="background: #444; margin-top: 5px;">Регистрация</button>
+    <button id="login-btn"><span class="btn-text">Войти</span></button>
+    <button id="register-btn" style="background: #444; margin-top: 5px;"><span class="btn-text">Регистрация</span></button>
     <p id="auth-error" class="error"></p>
 </div>
 
@@ -45,7 +59,7 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
-    // Ссылки на адреса (замени на свои hf.space адреса)
+    // Ссылки на адреса твоего Hugging Face
     const BACKEND_URL = "https://rotarempy-messenger.hf.space"; 
     const SOCKET_URL = "wss://rotarempy-messenger.hf.space";
 
@@ -55,6 +69,28 @@
     const authContainer = document.getElementById('auth-container');
     const chatContainer = document.getElementById('chat-container');
     const authError = document.getElementById('auth-error');
+    
+    const loginBtn = document.getElementById('login-btn');
+    const registerBtn = document.getElementById('register-btn');
+
+    // Функция включения/выключения режима загрузки на кнопке
+    function toggleLoading(button, isLoading, originalText) {
+        const textSpan = button.querySelector('.btn-text');
+        if (isLoading) {
+            button.disabled = true;
+            textSpan.style.display = 'none';
+            // Добавляем спиннер внутрь кнопки
+            const spinner = document.createElement('div');
+            spinner.classList.add('spinner');
+            button.appendChild(spinner);
+        } else {
+            button.disabled = false;
+            textSpan.style.display = 'inline';
+            // Удаляем спиннер
+            const spinner = button.querySelector('.spinner');
+            if (spinner) spinner.remove();
+        }
+    }
 
     function startChat(username) {
         currentUser = username;
@@ -102,40 +138,64 @@
         }
     }
 
-    document.getElementById('register-btn').addEventListener('click', async () => {
+    // Регистрация
+    registerBtn.addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
-        
-        const res = await fetch(`${BACKEND_URL}/api/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            authError.style.color = '#6bff6b';
-            authError.innerText = "Успешная регистрация! Теперь войдите.";
-        } else {
+        if(!u || !p) return authError.innerText = "Заполните поля!";
+
+        authError.innerText = "";
+        toggleLoading(registerBtn, true); // Включаем спиннер
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                authError.style.color = '#6bff6b';
+                authError.innerText = "Успешная регистрация! Теперь войдите.";
+            } else {
+                authError.style.color = '#ff6b6b';
+                authError.innerText = data.error;
+            }
+        } catch (err) {
             authError.style.color = '#ff6b6b';
-            authError.innerText = data.error;
+            authError.innerText = "Ошибка соединения с сервером";
+        } finally {
+            toggleLoading(registerBtn, false); // Выключаем спиннер
         }
     });
 
-    document.getElementById('login-btn').addEventListener('click', async () => {
+    // Вход
+    loginBtn.addEventListener('click', async () => {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value;
-        
-        const res = await fetch(`${BACKEND_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            startChat(data.username);
-        } else {
+        if(!u || !p) return authError.innerText = "Заполните поля!";
+
+        authError.innerText = "";
+        toggleLoading(loginBtn, true); // Включаем спиннер
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                startChat(data.username);
+            } else {
+                authError.style.color = '#ff6b6b';
+                authError.innerText = data.error;
+            }
+        } catch (err) {
             authError.style.color = '#ff6b6b';
-            authError.innerText = data.error;
+            authError.innerText = "Ошибка соединения с сервером";
+        } finally {
+            toggleLoading(loginBtn, false); // Выключаем спиннер в случае неудачи
         }
     });
 </script>
