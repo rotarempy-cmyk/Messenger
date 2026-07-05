@@ -162,10 +162,23 @@
         #chat-target-name { font-weight: 700; color: var(--text); font-size: 15px; }
 
         .messages-container { flex: 1; padding: 22px 26px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
-        .msg { max-width: 62%; padding: 10px 15px; font-size: 14px; line-height: 1.5; word-wrap: break-word; display: flex; flex-direction: column; transition: opacity .2s; }
-        .msg.me { background: var(--msg-me-bg); color: var(--msg-me-text); align-self: flex-end; border-radius: 18px 18px 4px 18px; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent); }
-        .msg.other { background: var(--msg-other-bg); color: var(--msg-other-text); align-self: flex-start; border-radius: 18px 18px 18px 4px; border: 1px solid var(--border); }
-        .msg-author { font-size: 11px; font-weight: 700; opacity: .65; margin-bottom: 3px; }
+
+        .msg-row { display: flex; gap: 9px; align-items: flex-end; max-width: 68%; transition: opacity .2s; }
+        .msg-row.me { align-self: flex-end; flex-direction: row-reverse; }
+        .msg-row.other { align-self: flex-start; }
+        .msg-row.grouped { margin-top: -6px; }
+        .msg-avatar-slot { width: 30px; flex-shrink: 0; }
+        .msg-avatar {
+            width: 30px; height: 30px; border-radius: 50%; object-fit: cover; display: block;
+            background: var(--surface-2); border: 1.5px solid var(--border);
+        }
+        .msg-bubble-wrap { display: flex; flex-direction: column; min-width: 0; }
+        .msg-row.me .msg-bubble-wrap { align-items: flex-end; }
+        .msg-author { font-size: 11.5px; font-weight: 700; color: var(--accent); margin-bottom: 4px; padding: 0 4px; }
+
+        .msg { padding: 10px 15px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+        .msg.me { background: var(--msg-me-bg); color: var(--msg-me-text); border-radius: 18px 18px 4px 18px; box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent); }
+        .msg.other { background: var(--msg-other-bg); color: var(--msg-other-text); border-radius: 18px 18px 18px 4px; border: 1px solid var(--border); }
 
         .input-bar { padding: 16px 20px; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
         #message-input { flex: 1; padding: 12px 18px; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 24px; color: var(--text); font-size: 14px; }
@@ -242,6 +255,33 @@
         .color-input { width: 44px; height: 30px; border: none; border-radius: 8px; background: none; cursor: pointer; padding: 0; }
         .color-input::-webkit-color-swatch-wrapper { padding: 0; }
         .color-input::-webkit-color-swatch { border-radius: 8px; border: 1px solid var(--border); }
+
+        /* ===== Выбор и обрезка аватарки ===== */
+        .avatar-picker { display: flex; align-items: center; gap: 14px; }
+        .avatar-picker-preview {
+            width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+            background-color: var(--surface-2); background-size: cover; background-position: center;
+            border: 2px solid var(--border); position: relative;
+        }
+        .avatar-picker-info { display: flex; flex-direction: column; gap: 6px; }
+        .avatar-picker-btn {
+            background: var(--surface-2); color: var(--text); border: 1.5px solid var(--border);
+            border-radius: 10px; padding: 8px 14px; font-size: 12.5px; font-weight: 700;
+            cursor: pointer; transition: .15s;
+        }
+        .avatar-picker-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .avatar-picker-hint { font-size: 11px; color: var(--text-muted); }
+
+        .crop-viewport {
+            width: 260px; height: 260px; margin: 4px auto 0; border-radius: 50%; overflow: hidden;
+            position: relative; background: var(--surface-2); cursor: grab; touch-action: none;
+            box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--border);
+        }
+        .crop-viewport:active { cursor: grabbing; }
+        .crop-viewport img { position: absolute; top: 50%; left: 50%; user-select: none; -webkit-user-drag: none; will-change: transform; }
+        .crop-zoom-row { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+        .crop-zoom-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+        .crop-hint { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -358,9 +398,16 @@
             <!-- ВКЛАДКА: ПРОФИЛЬ -->
             <div id="settings-tab-profile" class="settings-tab-content visible">
                 <div class="settings-section">
-                    <span class="settings-label">Смена аватарки (Файл изображения)</span>
-                    <input type="file" id="settings-avatar-file" accept="image/*" style="font-size:12px; margin-bottom:8px;">
-                    <button id="save-avatar-btn" class="action-btn accept-btn" style="width:100%;">Обновить аватарку</button>
+                    <span class="settings-label">Аватарка</span>
+                    <div class="avatar-picker">
+                        <div id="profile-avatar-preview" class="avatar-picker-preview"></div>
+                        <div class="avatar-picker-info">
+                            <button type="button" id="profile-avatar-pick-btn" class="avatar-picker-btn">Выбрать фото</button>
+                            <span class="avatar-picker-hint">JPG/PNG — с обрезкой под круг</span>
+                        </div>
+                        <input type="file" id="profile-avatar-file-input" accept="image/*" style="display:none;">
+                    </div>
+                    <button id="save-avatar-btn" class="action-btn accept-btn" style="width:100%; margin-top:10px;">Обновить аватарку</button>
                     <div id="settings-avatar-msg" style="font-size:11px; margin-top:5px;"></div>
                 </div>
 
@@ -436,7 +483,14 @@
             </div>
             <div class="settings-section">
                 <span class="settings-label">Аватар группы</span>
-                <input type="file" id="wizard-group-avatar-file" accept="image/*" style="font-size:12px; margin-bottom:10px;">
+                <div class="avatar-picker">
+                    <div id="wizard-group-avatar-preview" class="avatar-picker-preview"></div>
+                    <div class="avatar-picker-info">
+                        <button type="button" id="wizard-group-avatar-pick-btn" class="avatar-picker-btn">Выбрать фото</button>
+                        <span class="avatar-picker-hint">Необязательно</span>
+                    </div>
+                    <input type="file" id="wizard-group-avatar-file-input" accept="image/*" style="display:none;">
+                </div>
             </div>
             <div class="settings-section">
                 <span class="settings-label">Выберите участников (из списка друзей):</span>
@@ -460,7 +514,14 @@
                 </div>
                 <div class="settings-section">
                     <span class="settings-label">Изменить аватарку</span>
-                    <input type="file" id="group-edit-avatar-file" accept="image/*" style="font-size:12px; margin-bottom:10px;">
+                    <div class="avatar-picker">
+                        <div id="group-edit-avatar-preview" class="avatar-picker-preview"></div>
+                        <div class="avatar-picker-info">
+                            <button type="button" id="group-edit-avatar-pick-btn" class="avatar-picker-btn">Выбрать фото</button>
+                            <span class="avatar-picker-hint">Необязательно</span>
+                        </div>
+                        <input type="file" id="group-edit-avatar-file-input" accept="image/*" style="display:none;">
+                    </div>
                 </div>
             </div>
             
@@ -476,6 +537,26 @@
 
             <button id="save-group-settings-btn" class="action-btn accept-btn" style="width:100%; margin-top:10px; display:none;">Сохранить изменения</button>
             <div id="close-group-settings-btn" class="modal-close-btn">Закрыть</div>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: ОБРЕЗКА АВАТАРКИ (общая для профиля и групп) -->
+    <div id="avatar-crop-modal" class="modal-overlay">
+        <div class="modal-content" style="width:320px; align-items:center;">
+            <div class="modal-title" style="align-self:flex-start;">Обрезка аватарки</div>
+            <div id="crop-viewport" class="crop-viewport">
+                <img id="crop-image" alt="">
+            </div>
+            <div class="crop-zoom-row" style="width:100%;">
+                <span style="font-size:15px; color:var(--text-muted);">－</span>
+                <input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1">
+                <span style="font-size:15px; color:var(--text-muted);">＋</span>
+            </div>
+            <div class="crop-hint">Перетащите, чтобы выбрать область</div>
+            <div style="display:flex; gap:10px; width:100%; margin-top:16px;">
+                <button id="crop-cancel-btn" class="action-btn" style="flex:1; background:var(--surface-2); color:var(--text);">Отмена</button>
+                <button id="crop-apply-btn" class="action-btn accept-btn" style="flex:1;">Применить</button>
+            </div>
         </div>
     </div>
 
@@ -698,6 +779,138 @@
             return div.innerHTML;
         }
 
+        // ================= ОБРЕЗКА АВАТАРОК =================
+        // Общий кроппер для аватарки профиля и групп: превью + перетаскивание + зум,
+        // результат — квадратная картинка (JPEG), готовая стать круглой аватаркой.
+
+        const avatarPickerState = {}; // key -> обрезанный dataURL, ждущий сохранения
+        const CROP_BOX = 260;
+        const CROP_OUTPUT = 320;
+
+        const avatarCropModal = document.getElementById('avatar-crop-modal');
+        const cropViewport = document.getElementById('crop-viewport');
+        const cropImageEl = document.getElementById('crop-image');
+        const cropZoomInput = document.getElementById('crop-zoom');
+
+        let cropState = { imgEl: null, iw: 0, ih: 0, zoom: 1, posX: 0, posY: 0, onDone: null };
+        let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0, cropDragOrigX = 0, cropDragOrigY = 0;
+
+        function openAvatarCropper(file, onDone) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    cropState = { imgEl: img, iw: img.naturalWidth, ih: img.naturalHeight, zoom: 1, posX: 0, posY: 0, onDone };
+                    cropImageEl.src = img.src;
+                    cropZoomInput.value = '1';
+                    updateCropTransform();
+                    avatarCropModal.style.display = 'flex';
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function cropCoverScale() {
+            return Math.max(CROP_BOX / cropState.iw, CROP_BOX / cropState.ih);
+        }
+
+        function clampCropPan() {
+            const scaleFactor = cropCoverScale() * cropState.zoom;
+            const dw = cropState.iw * scaleFactor, dh = cropState.ih * scaleFactor;
+            const maxX = Math.max(0, (dw - CROP_BOX) / 2);
+            const maxY = Math.max(0, (dh - CROP_BOX) / 2);
+            cropState.posX = Math.max(-maxX, Math.min(maxX, cropState.posX));
+            cropState.posY = Math.max(-maxY, Math.min(maxY, cropState.posY));
+        }
+
+        function updateCropTransform() {
+            clampCropPan();
+            const scaleFactor = cropCoverScale() * cropState.zoom;
+            const dw = cropState.iw * scaleFactor, dh = cropState.ih * scaleFactor;
+            cropImageEl.style.width = dw + 'px';
+            cropImageEl.style.height = dh + 'px';
+            cropImageEl.style.transform = `translate(-50%, -50%) translate(${cropState.posX}px, ${cropState.posY}px)`;
+        }
+
+        cropZoomInput.addEventListener('input', () => {
+            cropState.zoom = parseFloat(cropZoomInput.value);
+            updateCropTransform();
+        });
+
+        cropViewport.addEventListener('pointerdown', (e) => {
+            if (!cropState.imgEl) return;
+            cropDragging = true;
+            cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+            cropDragOrigX = cropState.posX; cropDragOrigY = cropState.posY;
+            cropViewport.setPointerCapture(e.pointerId);
+        });
+        cropViewport.addEventListener('pointermove', (e) => {
+            if (!cropDragging) return;
+            cropState.posX = cropDragOrigX + (e.clientX - cropDragStartX);
+            cropState.posY = cropDragOrigY + (e.clientY - cropDragStartY);
+            updateCropTransform();
+        });
+        window.addEventListener('pointerup', () => { cropDragging = false; });
+
+        document.getElementById('crop-cancel-btn').addEventListener('click', () => {
+            avatarCropModal.style.display = 'none';
+        });
+
+        document.getElementById('crop-apply-btn').addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = CROP_OUTPUT; canvas.height = CROP_OUTPUT;
+            const ctx = canvas.getContext('2d');
+            const scaleFactor = cropCoverScale() * cropState.zoom;
+            const dw = cropState.iw * scaleFactor, dh = cropState.ih * scaleFactor;
+            const offX = CROP_BOX / 2 + cropState.posX - dw / 2;
+            const offY = CROP_BOX / 2 + cropState.posY - dh / 2;
+            const sx = -offX / scaleFactor, sy = -offY / scaleFactor;
+            const sSize = CROP_BOX / scaleFactor;
+            ctx.drawImage(cropState.imgEl, sx, sy, sSize, sSize, 0, 0, CROP_OUTPUT, CROP_OUTPUT);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+            avatarCropModal.style.display = 'none';
+            if (cropState.onDone) cropState.onDone(dataUrl);
+        });
+
+        // Подключает круглую кнопку-превью к скрытому input[type=file] и открывает
+        // кроппер при выборе файла; результат кладётся в avatarPickerState[key].
+        function initAvatarPicker(key, previewId, buttonId, fileInputId) {
+            const preview = document.getElementById(previewId);
+            const btn = document.getElementById(buttonId);
+            const fileInput = document.getElementById(fileInputId);
+            btn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files[0];
+                if (!file) return;
+                openAvatarCropper(file, (dataUrl) => {
+                    avatarPickerState[key] = dataUrl;
+                    preview.style.backgroundImage = `url(${dataUrl})`;
+                });
+                fileInput.value = '';
+            });
+        }
+
+        function setAvatarPickerPreview(key, previewId, avatarUrl, fallbackName) {
+            delete avatarPickerState[key];
+            document.getElementById(previewId).style.backgroundImage = `url(${getAvatarSrc(avatarUrl, fallbackName)})`;
+        }
+
+        initAvatarPicker('profile', 'profile-avatar-preview', 'profile-avatar-pick-btn', 'profile-avatar-file-input');
+        initAvatarPicker('group-create', 'wizard-group-avatar-preview', 'wizard-group-avatar-pick-btn', 'wizard-group-avatar-file-input');
+        initAvatarPicker('group-edit', 'group-edit-avatar-preview', 'group-edit-avatar-pick-btn', 'group-edit-avatar-file-input');
+
+        // Кэш аватарок отправителей — заполняется при открытии чата (для 1-на-1
+        // это собеседник, для групп — все участники), чтобы в переписке сразу
+        // показывались реальные аватарки без лишних запросов на каждое сообщение.
+        const avatarCache = new Map();
+        function cacheAvatar(username, resolvedSrc) { if (username) avatarCache.set(username, resolvedSrc); }
+        function getCachedAvatarSrc(username) { return avatarCache.get(username) || generateLetterAvatar(username); }
+
+        // Отслеживаем отправителя предыдущего сообщения, чтобы подряд идущие
+        // сообщения одного человека визуально группировались (без повтора аватарки/ника).
+        let lastRenderedSender = null;
+
         const authContainer = document.getElementById('auth-container');
         const messengerContainer = document.getElementById('messenger-container');
         const authError = document.getElementById('auth-error');
@@ -835,6 +1048,7 @@
             messengerContainer.style.display = 'flex';
             document.getElementById('my-name').innerText = currentUser;
             document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
+            cacheAvatar(currentUser, getAvatarSrc(currentUserAvatar, currentUser));
 
             // Подтягиваем то, что уже сохранено с прошлого визита (в т.ч. после
             // перезагрузки страницы), чтобы список чатов был виден мгновенно,
@@ -853,6 +1067,7 @@
                 if (chatId !== activeChatId) return; // на случай гонки при быстром переключении чатов
                 messagesContainer.innerHTML = '';
                 pendingSentMessages.length = 0;
+                lastRenderedSender = null;
                 messages.forEach(msg => appendMessage(msg));
             });
 
@@ -902,6 +1117,20 @@
                     if (currentTab === 'friends') loadFriendsList();
                     if (currentTab === 'chats') loadMyChats();
                 });
+                // Кто-то создал/изменил/покинул группу с нашим участием -
+                // обновляем список чатов, если он сейчас на экране.
+                socket.on('chats_updated', () => {
+                    if (currentTab === 'chats') loadMyChats();
+                });
+                // Название/аватар текущего открытого группового чата поменялись
+                // у другого участника — подхватываем сразу, без перезахода.
+                socket.on('group_updated', ({ chatId, groupName, groupAvatar }) => {
+                    if (chatId !== activeChatId) return;
+                    chatTargetName.innerText = groupName;
+                    const hAvatar = document.getElementById('chat-header-avatar');
+                    hAvatar.src = getAvatarSrc(groupAvatar, groupName);
+                    if (currentGroupData) { currentGroupData.groupName = groupName; currentGroupData.groupAvatar = groupAvatar; }
+                });
             }
         }
 
@@ -948,7 +1177,7 @@
         // Открытие мастера создания группы
         document.getElementById('open-group-wizard-btn').addEventListener('click', async () => {
             document.getElementById('wizard-group-name').value = '';
-            document.getElementById('wizard-group-avatar-file').value = '';
+            setAvatarPickerPreview('group-create', 'wizard-group-avatar-preview', '', '?');
             const wList = document.getElementById('wizard-friends-list');
             wList.innerHTML = 'Загрузка друзей...';
             groupWizardModal.style.display = 'flex';
@@ -981,19 +1210,9 @@
             const checkboxes = document.getElementById('wizard-friends-list').querySelectorAll('input[type="checkbox"]:checked');
             const members = Array.from(checkboxes).map(cb => cb.value);
 
-            const fileInput = document.getElementById('wizard-group-avatar-file');
-            const file = fileInput.files[0];
+            const base64Avatar = avatarPickerState['group-create'] || '';
 
             toggleLoading(document.getElementById('submit-group-btn'), true);
-
-            let base64Avatar = '';
-            if (file) {
-                base64Avatar = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.readAsDataURL(file);
-                });
-            }
 
             try {
                 const res = await fetch(`${BACKEND_URL}/api/groups/create`, {
@@ -1002,8 +1221,12 @@
                     body: JSON.stringify({ name, avatar: base64Avatar, members })
                 });
                 if (res.ok) {
+                    delete avatarPickerState['group-create'];
                     groupWizardModal.style.display = 'none';
                     loadMyChats();
+                } else {
+                    const d = await res.json();
+                    alert(d.error || 'Не удалось создать группу');
                 }
             } catch(e) {}
             finally { toggleLoading(document.getElementById('submit-group-btn'), false); }
@@ -1019,7 +1242,7 @@
             document.getElementById('group-invite-zone').style.display = isAdmin ? 'block' : 'none';
             
             document.getElementById('group-edit-name').value = currentGroupData.groupName;
-            document.getElementById('group-edit-avatar-file').value = '';
+            setAvatarPickerPreview('group-edit', 'group-edit-avatar-preview', currentGroupData.groupAvatar, currentGroupData.groupName);
             
             renderGroupMembersManagement();
             if (isAdmin) renderGroupInviteList();
@@ -1109,19 +1332,9 @@
             const newName = document.getElementById('group-edit-name').value.trim();
             if(!newName) return alert('Имя группы не может быть пустым');
 
-            const fileInput = document.getElementById('group-edit-avatar-file');
-            const file = fileInput.files[0];
+            const base64Avatar = avatarPickerState['group-edit'] !== undefined ? avatarPickerState['group-edit'] : currentGroupData.groupAvatar;
 
             toggleLoading(document.getElementById('save-group-settings-btn'), true);
-
-            let base64Avatar = currentGroupData.groupAvatar;
-            if (file) {
-                base64Avatar = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.readAsDataURL(file);
-                });
-            }
 
             try {
                 const res = await fetch(`${BACKEND_URL}/api/groups/${currentGroupData._id}/update`, {
@@ -1135,10 +1348,14 @@
                     })
                 });
                 if(res.ok) {
+                    delete avatarPickerState['group-edit'];
                     groupSettingsModal.style.display = 'none';
                     // Перезапрашиваем чат
                     openChat(currentGroupData._id, newName, getAvatarSrc(base64Avatar, newName), true);
                     loadMyChats();
+                } else {
+                    const d = await res.json();
+                    alert(d.error || 'Не удалось сохранить изменения');
                 }
             } catch(e){}
             finally { toggleLoading(document.getElementById('save-group-settings-btn'), false); }
@@ -1326,6 +1543,7 @@
             // из-за чего переключение выглядело "подвисшим".
             messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">Загрузка сообщений...</div>';
             pendingSentMessages.length = 0;
+            lastRenderedSender = null;
 
             const hAvatar = document.getElementById('chat-header-avatar');
             hAvatar.src = avatarUrl;
@@ -1339,11 +1557,19 @@
                         method: 'GET',
                         headers: { 'Authorization': `Bearer ${currentUserToken}` }
                     });
-                    if (gRes.ok) currentGroupData = await gRes.json();
+                    if (gRes.ok) {
+                        currentGroupData = await gRes.json();
+                        // Кэшируем аватарки всех участников группы разом -
+                        // иначе для каждого отправителя пришлось бы делать отдельный запрос.
+                        (currentGroupData.participantsInfo || []).forEach(p => {
+                            cacheAvatar(p.username, getAvatarSrc(p.avatarUrl, p.username));
+                        });
+                    }
                 } catch(e){}
             } else {
                 openGroupSettingsBtn.style.display = 'none';
                 currentGroupData = null;
+                cacheAvatar(title, avatarUrl);
             }
 
             socket.emit('join_chat', { chatId: chatId });
@@ -1523,7 +1749,7 @@
         // ================= НАСТРОЙКИ И МУЛЬТИАККАУНТИНГ =================
 
         document.getElementById('open-settings-btn').addEventListener('click', () => {
-            document.getElementById('settings-avatar-file').value = "";
+            setAvatarPickerPreview('profile', 'profile-avatar-preview', currentUserAvatar, currentUser);
             document.getElementById('settings-avatar-msg').innerText = "";
             document.getElementById('settings-password-msg').innerText = "";
             switchSettingsTab('profile');
@@ -1636,30 +1862,27 @@
         });
 
         document.getElementById('save-avatar-btn').addEventListener('click', async () => {
-            const file = document.getElementById('settings-avatar-file').files[0];
+            const dataUrl = avatarPickerState['profile'];
             const msg = document.getElementById('settings-avatar-msg');
-            if(!file) return;
+            if (!dataUrl) { msg.style.color = 'var(--danger)'; msg.innerText = "Сначала выберите фото"; return; }
 
             toggleLoading(document.getElementById('save-avatar-btn'), true);
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = async () => {
-                try {
-                    const res = await fetch(`${BACKEND_URL}/api/settings/update-avatar`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUserToken}` },
-                        body: JSON.stringify({ avatarUrl: reader.result })
-                    });
-                    const d = await res.json();
-                    if(res.ok) {
-                        currentUserAvatar = d.avatarUrl;
-                        document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
-                        saveAccountToStorage(currentUser, currentUserAvatar, currentUserToken);
-                        msg.style.color = 'var(--success)'; msg.innerText = "Аватар изменен!";
-                    }
-                } catch(e){}
-                finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
-            };
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/settings/update-avatar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUserToken}` },
+                    body: JSON.stringify({ avatarUrl: dataUrl })
+                });
+                const d = await res.json();
+                if(res.ok) {
+                    currentUserAvatar = d.avatarUrl;
+                    document.getElementById('my-avatar-img').src = getAvatarSrc(currentUserAvatar, currentUser);
+                    saveAccountToStorage(currentUser, currentUserAvatar, currentUserToken);
+                    delete avatarPickerState['profile'];
+                    msg.style.color = 'var(--success)'; msg.innerText = "Аватар изменен!";
+                }
+            } catch(e){}
+            finally { toggleLoading(document.getElementById('save-avatar-btn'), false); }
         });
 
         document.getElementById('save-password-btn').addEventListener('click', async () => {
@@ -1707,23 +1930,51 @@
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
         function appendMessage(msgData, options = {}) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('msg');
-            messageElement.classList.add(msgData.sender === currentUser ? 'me' : 'other');
+            const isMe = msgData.sender === currentUser;
+            // Если предыдущее сообщение в чате от того же (не нашего) отправителя -
+            // не повторяем аватарку и ник, просто визуально "прижимаем" сообщения друг к другу.
+            const isGrouped = !isMe && lastRenderedSender === msgData.sender;
+            lastRenderedSender = msgData.sender;
 
-            const authorSpan = document.createElement('span');
-            authorSpan.className = 'msg-author';
-            authorSpan.textContent = msgData.sender;
-            messageElement.appendChild(authorSpan);
+            const row = document.createElement('div');
+            row.className = `msg-row ${isMe ? 'me' : 'other'}${isGrouped ? ' grouped' : ''}`;
+
+            if (!isMe) {
+                const avatarSlot = document.createElement('div');
+                avatarSlot.className = 'msg-avatar-slot';
+                if (!isGrouped) {
+                    const img = document.createElement('img');
+                    img.className = 'msg-avatar';
+                    img.alt = '';
+                    img.src = getCachedAvatarSrc(msgData.sender);
+                    avatarSlot.appendChild(img);
+                }
+                row.appendChild(avatarSlot);
+            }
+
+            const bubbleWrap = document.createElement('div');
+            bubbleWrap.className = 'msg-bubble-wrap';
+
+            if (!isMe && !isGrouped) {
+                const authorDiv = document.createElement('div');
+                authorDiv.className = 'msg-author';
+                authorDiv.textContent = msgData.sender; // textContent — защита от XSS в нике
+                bubbleWrap.appendChild(authorDiv);
+            }
+
+            const bubble = document.createElement('div');
+            bubble.className = `msg ${isMe ? 'me' : 'other'}`;
             // textContent, а не innerHTML — иначе сообщение с HTML/скриптом
             // внутри выполнится у получателя (хранимый XSS).
-            messageElement.appendChild(document.createTextNode(msgData.text));
+            bubble.appendChild(document.createTextNode(msgData.text));
+            bubbleWrap.appendChild(bubble);
 
-            if (options.pending) messageElement.style.opacity = '0.55';
+            row.appendChild(bubbleWrap);
+            if (options.pending) row.style.opacity = '0.55';
 
-            messagesContainer.appendChild(messageElement);
+            messagesContainer.appendChild(row);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            return messageElement;
+            return row;
         }
 
         // Закрытие модалок по кнопкам
