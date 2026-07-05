@@ -32,11 +32,12 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        html, body { height: 100%; }
+        html, body { height: 100%; height: 100dvh; }
         body {
             background-color: var(--bg);
             color: var(--text);
             height: 100vh;
+            height: 100dvh;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -91,7 +92,7 @@
         #auth-error { font-size: 12px; color: var(--danger); text-align: center; margin-top: 5px; min-height: 18px; }
 
         /* Основной интерфейс */
-        #messenger-container { display: none; width: 100vw; height: 100vh; background: var(--bg); }
+        #messenger-container { display: none; width: 100vw; height: 100vh; height: 100dvh; background: var(--bg); }
 
         /* Левая панель */
         .sidebar { width: 330px; height: 100%; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
@@ -195,7 +196,7 @@
         #send-btn:active { transform: scale(.96); }
 
         /* Модальные окна */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content {
             background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
             width: 380px; padding: 26px; display: flex; flex-direction: column;
@@ -282,6 +283,60 @@
         .crop-zoom-row { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
         .crop-zoom-row input[type="range"] { flex: 1; accent-color: var(--accent); }
         .crop-hint { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 10px; }
+
+        /* Кнопка "назад" в шапке чата — видна только в мобильной раскладке */
+        .mobile-back-btn {
+            display: none; background: none; border: none; color: var(--text);
+            font-size: 26px; line-height: 1; width: 30px; height: 30px; cursor: pointer;
+            align-items: center; justify-content: center; flex-shrink: 0; margin-right: 2px;
+        }
+
+        /* ============================================================
+           МОБИЛЬНАЯ РАСКЛАДКА (телефоны, узкие экраны)
+           Список чатов и сама переписка показываются как два отдельных
+           "экрана": по умолчанию виден список, после тапа на чат —
+           открывается переписка на весь экран с кнопкой "назад".
+           ============================================================ */
+        @media (max-width: 760px) {
+            #auth-container { width: 100%; max-width: 360px; padding: 30px 22px; }
+
+            .modal-content { width: 100%; max-width: 400px; padding: 20px 16px; border-radius: 18px 18px 0 0; max-height: 92dvh; }
+            .modal-overlay { align-items: flex-end; }
+            .modal-overlay .modal-content { animation: none; }
+
+            #app-shell { position: relative; overflow: hidden; }
+
+            .sidebar { width: 100%; border-right: none; }
+            .chat-area { width: 100%; position: absolute; top: 0; left: 100%; height: 100%; transition: left .22s ease; }
+
+            /* По умолчанию на телефоне видно список; чат выезжает поверх него */
+            #app-shell:not(.chat-open) .sidebar { display: flex; }
+            #app-shell:not(.chat-open) .chat-area { left: 100%; }
+            #app-shell.chat-open .sidebar { display: none; }
+            #app-shell.chat-open .chat-area { left: 0; }
+
+            .mobile-back-btn { display: flex; }
+
+            /* Placeholder "выберите чат" не нужен на телефоне - там и так
+               по умолчанию виден список, а не пустая область справа */
+            .chat-placeholder { display: none !important; }
+
+            /* Крупнее зоны нажатия и без авто-зума iOS на полях ввода (шрифт >=16px) */
+            .input-field, #search-input, #message-input, .settings-tab-btn, .tab-btn { font-size: 16px; }
+            .action-btn { min-height: 40px; }
+            .gear-btn { width: 38px; height: 38px; }
+            .tab-btn { padding: 11px 6px; }
+            .list-item { padding: 13px 15px; }
+
+            .avatar-picker { flex-wrap: wrap; }
+            .theme-presets-grid { grid-template-columns: repeat(2, 1fr); }
+
+            #context-menu { display: none !important; } /* на тачскрине нет ПКМ - используем кнопку в настройках группы */
+        }
+
+        @media (max-width: 380px) {
+            .modal-content { padding: 16px 12px; }
+        }
     </style>
 </head>
 <body>
@@ -302,7 +357,7 @@
 
     <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
     <div id="messenger-container">
-        <div style="display: flex; width: 100%; height: 100%;">
+        <div id="app-shell" style="display: flex; width: 100%; height: 100%;">
             
             <!-- Левый сайдбар -->
             <div class="sidebar">
@@ -352,6 +407,7 @@
                 <div id="chat-main" class="chat-main">
                     <div class="chat-header">
                         <div class="chat-header-left">
+                            <button id="mobile-back-btn" class="mobile-back-btn" aria-label="Назад к списку">‹</button>
                             <img id="chat-header-avatar" class="avatar-mini" src="" alt="" style="display:none;">
                             <span id="chat-target-name">Разговор</span>
                         </div>
@@ -536,6 +592,7 @@
             </div>
 
             <button id="save-group-settings-btn" class="action-btn accept-btn" style="width:100%; margin-top:10px; display:none;">Сохранить изменения</button>
+            <button id="leave-group-btn" class="action-btn" style="width:100%; margin-top:10px; background:var(--danger); color:#fff;">Покинуть группу</button>
             <div id="close-group-settings-btn" class="modal-close-btn">Закрыть</div>
         </div>
     </div>
@@ -910,6 +967,28 @@
         // Отслеживаем отправителя предыдущего сообщения, чтобы подряд идущие
         // сообщения одного человека визуально группировались (без повтора аватарки/ника).
         let lastRenderedSender = null;
+
+        // ================= МОБИЛЬНАЯ НАВИГАЦИЯ =================
+        // На узких экранах список чатов и сама переписка не помещаются рядом,
+        // поэтому показываем их как два отдельных "экрана": список чатов
+        // (по умолчанию) или открытый чат (после тапа), с кнопкой "назад".
+
+        const appShell = document.getElementById('app-shell');
+        const mobileBackBtn = document.getElementById('mobile-back-btn');
+
+        function isMobileView() {
+            return window.matchMedia('(max-width: 760px)').matches;
+        }
+
+        function enterMobileChatView() {
+            if (isMobileView()) appShell.classList.add('chat-open');
+        }
+
+        function exitMobileChatView() {
+            appShell.classList.remove('chat-open');
+        }
+
+        mobileBackBtn.addEventListener('click', exitMobileChatView);
 
         const authContainer = document.getElementById('auth-container');
         const messengerContainer = document.getElementById('messenger-container');
@@ -1370,15 +1449,23 @@
                     headers: { 'Authorization': `Bearer ${currentUserToken}` }
                 });
                 if(res.ok) {
+                    groupSettingsModal.style.display = 'none';
                     if (activeChatId === chatId) {
                         activeChatId = null;
                         chatPlaceholder.style.display = 'flex';
                         chatMain.style.display = 'none';
+                        exitMobileChatView();
                     }
                     loadMyChats();
                 }
             } catch(e){}
         }
+
+        // Кнопка "Покинуть группу" прямо в настройках — основной способ выйти
+        // (правый клик по чату неудобен/недоступен на телефоне).
+        document.getElementById('leave-group-btn').addEventListener('click', () => {
+            if (currentGroupData) leaveGroup(currentGroupData._id);
+        });
 
         // ОБРАБОТКА ПКМ НА СПИСКЕ ЧАТОВ
         window.addEventListener('click', () => { contextMenu.style.display = 'none'; });
@@ -1537,6 +1624,7 @@
             chatPlaceholder.style.display = 'none';
             chatMain.style.display = 'flex';
             chatTargetName.innerText = title;
+            enterMobileChatView();
 
             // Чистим окно сообщений сразу же — раньше старая переписка
             // оставалась на экране, пока не придёт история нового чата,
