@@ -722,7 +722,18 @@ function renderGroupMembersManagement() {
         row.innerHTML = `
             <span>${p}<b>${badgeText}</b></span>
             <div style="display:flex; gap:4px;">
-                ${isAdmin && !isTargetAdmin ? `<button class="action-btn accept-btn" style="min-height:20px; font-size:10px; padding:2px 6px;" onclick="makeGroupAdmin('${p}')">Админ</button>` : ''}
+                ${isAdmin && !isTargetAdmin ? `
+                <button class="action-btn accept-btn"
+                style="min-height:20px;font-size:10px;padding:2px 6px;"
+                onclick="makeGroupAdmin('${p}')">
+                Админ
+                </button>` : ''}
+                ${isAdmin && isTargetAdmin && !isCreator && p !== currentUser ? `
+                <button class="action-btn"
+                style="background:#d08a00;min-height:20px;font-size:10px;padding:2px 6px;"
+                onclick="removeGroupAdmin('${p}')">
+                Снять
+                </button>` : ''}
                 ${isAdmin && p !== currentUser && !isCreator ? `<button class="action-btn reject-btn" style="min-height:20px; font-size:10px; padding:2px 6px;" onclick="kickGroupMember('${p}')">Исключить</button>` : ''}
             </div>
         `;

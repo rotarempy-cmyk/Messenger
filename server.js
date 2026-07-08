@@ -53,6 +53,11 @@ function isValidObjectId(v) {
     return typeof v === 'string' && mongoose.Types.ObjectId.isValid(v);
 }
 
+// Название группы: 2-40 символов любых печатных (эмодзи допустимы)
+function isValidGroupName(v) {
+    return typeof v === 'string' && v.trim().length >= 2 && v.trim().length <= 40;
+}
+
 // ================= ПРОСТОЙ RATE LIMIT (без доп. зависимостей) =================
 // Защита /login и /register от подбора пароля / спам-регистрации.
 
@@ -102,7 +107,12 @@ const SessionSchema = new mongoose.Schema({
 const Session = mongoose.model('GigaSession', SessionSchema);
 
 const ChatSchema = new mongoose.Schema({
-    participants: [{ type: String, index: true }]
+    participants: [{ type: String, index: true }],
+    isGroup: { type: Boolean, default: false },
+    groupName: { type: String, default: '' },
+    groupAvatar: { type: String, default: '' },
+    admins: [{ type: String }],
+    creator: { type: String, default: null }
 });
 ChatSchema.index({ participants: 1 });
 const Chat = mongoose.model('GigaChat', ChatSchema);
@@ -310,8 +320,11 @@ app.post('/api/chats', authenticateToken, async (req, res) => {
 
         if (targetUsername) {
             if (!isValidString(targetUsername)) return res.status(400).json({ error: 'Некорректные данные' });
+            // isGroup:{$ne:true} — иначе групповой чат с этими же двумя участниками
+            // мог бы случайно "найтись" вместо личного 1-на-1 чата.
             let chat = await Chat.findOne({
-                participants: { $all: [myUsername, targetUsername] }
+                participants: { $all: [myUsername, targetUsername], $size: 2 },
+                isGroup: { $ne: true }
             });
             if (!chat) {
                 chat = new Chat({ participants: [myUsername, targetUsername] });
@@ -323,28 +336,204 @@ app.post('/api/chats', authenticateToken, async (req, res) => {
         const myChats = await Chat.find({ participants: myUsername }).lean();
         if (!myChats || myChats.length === 0) return res.json([]);
 
+        const directChats = myChats.filter(c => !c.isGroup);
+        const groupChats = myChats.filter(c => c.isGroup);
+
         // Батчим запрос аватаров одним запросом вместо N+1
-        const targetNames = myChats.map(chat => {
+        const targetNames = directChats.map(chat => {
             const participants = chat.participants || [];
             return participants.find(p => p !== myUsername) || myUsername;
         });
         const users = await User.find({ username: { $in: targetNames } }, 'username avatarUrl').lean();
         const avatarMap = new Map(users.map(u => [u.username, u.avatarUrl]));
 
-        const chatsWithDetails = myChats.map((chat, i) => {
+        const directResults = directChats.map((chat, i) => {
             const targetUser = targetNames[i];
             return {
                 _id: chat._id,
                 participants: chat.participants || [],
+                isGroup: false,
                 targetUser,
                 avatarUrl: avatarMap.get(targetUser) || `letter:${targetUser}`
             };
         });
 
-        res.json(chatsWithDetails);
+        const groupResults = groupChats.map(chat => ({
+            _id: chat._id,
+            participants: chat.participants || [],
+            isGroup: true,
+            groupName: chat.groupName,
+            groupAvatar: chat.groupAvatar,
+            admins: chat.admins || [],
+            creator: chat.creator
+        }));
+
+        res.json([...directResults, ...groupResults]);
     } catch (error) {
         console.error("Ошибка в эндпоинте /api/chats:", error);
         res.status(500).json({ error: 'Ошибка при работе с чатами' });
+    }
+});
+
+// ================= ГРУППОВЫЕ ЧАТЫ =================
+
+app.post('/api/groups/create', authenticateToken, async (req, res) => {
+    try {
+        const myUsername = req.username;
+        const { name, avatar, members } = req.body;
+
+        if (!isValidGroupName(name)) return res.status(400).json({ error: 'Название группы: 2-40 символов' });
+        if (avatar && !isValidAvatar(avatar)) return res.status(400).json({ error: 'Некорректное изображение' });
+
+        let memberList = Array.isArray(members) ? members.filter(m => isValidString(m)) : [];
+        memberList = [...new Set(memberList)].filter(m => m !== myUsername);
+
+        // Разрешаем добавлять в группу только реальных друзей — иначе можно
+        // было бы затащить в группу произвольного незнакомого пользователя.
+        if (memberList.length > 0) {
+            const friendships = await Friendship.find({
+                status: 'accepted',
+                $or: [
+                    { sender: myUsername, receiver: { $in: memberList } },
+                    { receiver: myUsername, sender: { $in: memberList } }
+                ]
+            }).lean();
+            const friendSet = new Set(friendships.map(f => f.sender === myUsername ? f.receiver : f.sender));
+            memberList = memberList.filter(m => friendSet.has(m));
+        }
+
+        const participants = [myUsername, ...memberList];
+
+        const chat = new Chat({
+            participants,
+            isGroup: true,
+            groupName: name.trim(),
+            groupAvatar: avatar || '',
+            admins: [myUsername],
+            creator: myUsername
+        });
+        await chat.save();
+
+        // Мгновенно уведомляем всех приглашённых, чтобы группа появилась
+        // в их списке чатов без ожидания опроса.
+        memberList.forEach(m => io.to(`user:${m}`).emit('chats_updated'));
+
+        res.status(201).json(chat);
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка создания группы' });
+    }
+});
+
+app.get('/api/groups/:id', authenticateToken, async (req, res) => {
+    try {
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Некорректный id' });
+        const chat = await Chat.findById(req.params.id).lean();
+        if (!chat || !chat.isGroup) return res.status(404).json({ error: 'Группа не найдена' });
+        if (!chat.participants.includes(req.username)) return res.status(403).json({ error: 'Недоступно' });
+
+        // Отдаём аватарки участников одним батчем — фронту это нужно, чтобы
+        // сразу показывать аватарки отправителей в переписке.
+        const users = await User.find({ username: { $in: chat.participants } }, 'username avatarUrl').lean();
+        const avatarMap = new Map(users.map(u => [u.username, u.avatarUrl]));
+        const participantsInfo = chat.participants.map(p => ({
+            username: p,
+            avatarUrl: avatarMap.get(p) || `letter:${p}`
+        }));
+
+        res.json({
+            _id: chat._id,
+            isGroup: true,
+            groupName: chat.groupName,
+            groupAvatar: chat.groupAvatar,
+            admins: chat.admins || [],
+            creator: chat.creator,
+            participants: chat.participants,
+            participantsInfo
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка получения группы' });
+    }
+});
+
+app.post('/api/groups/:id/update', authenticateToken, async (req, res) => {
+    try {
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Некорректный id' });
+        const chat = await Chat.findById(req.params.id);
+        if (!chat || !chat.isGroup) return res.status(404).json({ error: 'Группа не найдена' });
+
+        // Только админы группы могут менять её настройки
+        if (!chat.admins.includes(req.username)) return res.status(403).json({ error: 'Недоступно' });
+
+        const { name, avatar, admins, participants } = req.body;
+
+        if (name !== undefined) {
+            if (!isValidGroupName(name)) return res.status(400).json({ error: 'Название группы: 2-40 символов' });
+            chat.groupName = name.trim();
+        }
+        if (avatar !== undefined && avatar !== chat.groupAvatar) {
+            if (avatar && !isValidAvatar(avatar)) return res.status(400).json({ error: 'Некорректное изображение' });
+            chat.groupAvatar = avatar || '';
+        }
+
+        if (Array.isArray(participants)) {
+            let newParticipants = [...new Set(participants.filter(p => isValidString(p)))];
+            // Создатель группы не может быть исключён через этот эндпоинт
+            if (!newParticipants.includes(chat.creator)) newParticipants.push(chat.creator);
+            chat.participants = newParticipants;
+        }
+
+        if (Array.isArray(admins)) {
+            let newAdmins = [...new Set(admins.filter(a => isValidString(a) && chat.participants.includes(a)))];
+            if (!newAdmins.includes(chat.creator)) newAdmins.push(chat.creator);
+            chat.admins = newAdmins;
+        }
+
+        await chat.save();
+
+        chat.participants.forEach(p => io.to(`user:${p}`).emit('chats_updated'));
+        io.to(String(chat._id)).emit('group_updated', {
+            chatId: chat._id, groupName: chat.groupName, groupAvatar: chat.groupAvatar
+        });
+
+        res.json(chat);
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка обновления группы' });
+    }
+});
+
+app.post('/api/groups/:id/leave', authenticateToken, async (req, res) => {
+    try {
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Некорректный id' });
+        const chat = await Chat.findById(req.params.id);
+        if (!chat || !chat.isGroup) return res.status(404).json({ error: 'Группа не найдена' });
+        if (!chat.participants.includes(req.username)) return res.status(404).json({ error: 'Вы не состоите в этой группе' });
+
+        chat.participants = chat.participants.filter(p => p !== req.username);
+        chat.admins = chat.admins.filter(a => a !== req.username);
+
+        if (chat.participants.length === 0) {
+            await Chat.findByIdAndDelete(chat._id);
+            await Message.deleteMany({ chatId: chat._id });
+            return res.json({ message: 'Группа удалена (не осталось участников)' });
+        }
+
+        // Если из группы вышел создатель или не осталось ни одного админа —
+        // передаём права первому оставшемуся участнику, чтобы группа не
+        // осталась без управления.
+        if (chat.admins.length === 0) {
+            chat.admins = [chat.participants[0]];
+        }
+        if (chat.creator === req.username) {
+            chat.creator = chat.admins[0];
+        }
+
+        await chat.save();
+        io.to(`user:${req.username}`).emit('chats_updated');
+        chat.participants.forEach(p => io.to(`user:${p}`).emit('chats_updated'));
+
+        res.json({ message: 'Вы покинули группу' });
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка выхода из группы' });
     }
 });
 
