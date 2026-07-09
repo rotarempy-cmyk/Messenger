@@ -204,6 +204,25 @@ function loadListCacheFromStorage(tabName) {
 // сообщений — нужна для оптимистичного рендера без дублей.
 const pendingSentMessages = [];
 
+// Кэш уже загруженных сообщений по chatId (в памяти, живёт до перезагрузки
+// страницы). Позволяет при повторном открытии чата показать переписку
+// мгновенно, не дожидаясь ответа сервера — сервер всё равно опрашивается
+// в фоне и досылает изменения, если они были.
+const messagesCache = new Map();
+
+// Короткая "подпись" списка сообщений (по их id) — чтобы понять,
+// пришло ли от сервера что-то новое, или это те же сообщения,
+// что уже показаны из кэша (и тогда не нужно дёргать экран).
+function messagesSignature(messages) {
+    return messages.map(m => m._id).join(',');
+}
+
+function renderMessagesList(messages) {
+    messagesContainer.innerHTML = '';
+    lastRenderedSender = null;
+    messages.forEach(msg => appendMessage(msg));
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
@@ -518,14 +537,28 @@ function initMessenger(username, avatarUrl, token) {
 
     socket.on('load_history', ({ chatId, messages }) => {
         if (chatId !== activeChatId) return; // на случай гонки при быстром переключении чатов
-        messagesContainer.innerHTML = '';
+
+        // Если то, что прислал сервер, совпадает с тем, что уже показано
+        // из кэша (при повторном открытии чата) — экран не трогаем,
+        // чтобы не было "мигания" и сброса скролла.
+        const cached = messagesCache.get(chatId);
+        const isSameAsShown = cached && messagesSignature(cached) === messagesSignature(messages);
+
+        messagesCache.set(chatId, messages);
         pendingSentMessages.length = 0;
-        lastRenderedSender = null;
-        messages.forEach(msg => appendMessage(msg));
+
+        if (isSameAsShown) return;
+        renderMessagesList(messages);
     });
 
     socket.on('receive_message', (msgData) => {
         if (msgData.chatId !== activeChatId) return;
+
+        // Держим кэш чата в актуальном состоянии, чтобы при следующем
+        // открытии этого чата новое сообщение уже было видно сразу.
+        const cached = messagesCache.get(msgData.chatId) || [];
+        cached.push(msgData);
+        messagesCache.set(msgData.chatId, cached);
 
         // Если это подтверждение НАШЕГО же оптимистично отправленного
         // сообщения — не дублируем, а просто "подтверждаем" уже нарисованное.
@@ -746,6 +779,11 @@ async function makeGroupAdmin(username) {
         currentGroupData.admins.push(username);
         renderGroupMembersManagement();
     }
+}
+
+async function removeGroupAdmin(username) {
+    currentGroupData.admins = currentGroupData.admins.filter(a => a !== username);
+    renderGroupMembersManagement();
 }
 
 async function kickGroupMember(username) {
@@ -1011,12 +1049,19 @@ async function openChat(chatId, title, avatarUrl, isGroup = false) {
     chatTargetName.innerText = title;
     enterMobileChatView();
 
-    // Чистим окно сообщений сразу же — раньше старая переписка
-    // оставалась на экране, пока не придёт история нового чата,
-    // из-за чего переключение выглядело "подвисшим".
-    messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">Загрузка сообщений...</div>';
+    // Если этот чат уже открывали раньше — сообщения есть в кэше,
+    // рисуем их сразу же, не дожидаясь ответа сервера. Сервер всё равно
+    // опрашивается ниже (join_chat) и досылает свежие данные, если
+    // что-то изменилось. Если чат открывается впервые — показываем
+    // прежний плейсхолдер, пока не придёт история.
+    const cachedMessages = messagesCache.get(chatId);
+    if (cachedMessages) {
+        renderMessagesList(cachedMessages);
+    } else {
+        messagesContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:12px; padding:20px;">Загрузка сообщений...</div>';
+        lastRenderedSender = null;
+    }
     pendingSentMessages.length = 0;
-    lastRenderedSender = null;
 
     const hAvatar = document.getElementById('chat-header-avatar');
     hAvatar.src = avatarUrl;
