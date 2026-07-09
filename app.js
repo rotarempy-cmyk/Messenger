@@ -210,6 +210,37 @@ const pendingSentMessages = [];
 // в фоне и досылает изменения, если они были.
 const messagesCache = new Map();
 
+// На каждый чат храним не больше стольких сообщений в кэше — история
+// длиннее просто подтянется заново с сервера при открытии чата.
+const MAX_CACHED_MESSAGES_PER_CHAT = 150;
+
+function messagesCacheStorageKey() {
+    return `giga_cache_messages_${currentUser}`;
+}
+
+// Сохраняем кэш сообщений в localStorage, чтобы он переживал перезагрузку
+// страницы (как и вход в аккаунт) — точно так же, как уже сделано для
+// списка чатов/друзей/заявок.
+function persistMessagesCache() {
+    try {
+        const obj = {};
+        messagesCache.forEach((msgs, chatId) => { obj[chatId] = msgs; });
+        localStorage.setItem(messagesCacheStorageKey(), JSON.stringify(obj));
+    } catch (e) {
+        // localStorage переполнен — не критично, просто кэш не сохранится
+        // на этот раз (в памяти всё равно останется до перезагрузки).
+    }
+}
+
+function loadMessagesCacheFromStorage() {
+    try {
+        const raw = localStorage.getItem(messagesCacheStorageKey());
+        if (!raw) return;
+        const obj = JSON.parse(raw);
+        Object.keys(obj).forEach(chatId => messagesCache.set(chatId, obj[chatId]));
+    } catch (e) {}
+}
+
 // Короткая "подпись" списка сообщений (по их id) — чтобы понять,
 // пришло ли от сервера что-то новое, или это те же сообщения,
 // что уже показаны из кэша (и тогда не нужно дёргать экран).
@@ -528,6 +559,7 @@ function initMessenger(username, avatarUrl, token) {
     loadListCacheFromStorage('chats');
     loadListCacheFromStorage('friends');
     loadListCacheFromStorage('requests');
+    loadMessagesCacheFromStorage();
 
     if (socket) socket.disconnect();
     // Токен передаём при подключении — сервер отклонит соединение
@@ -545,6 +577,7 @@ function initMessenger(username, avatarUrl, token) {
         const isSameAsShown = cached && messagesSignature(cached) === messagesSignature(messages);
 
         messagesCache.set(chatId, messages);
+        persistMessagesCache();
         pendingSentMessages.length = 0;
 
         if (isSameAsShown) return;
@@ -558,7 +591,11 @@ function initMessenger(username, avatarUrl, token) {
         // открытии этого чата новое сообщение уже было видно сразу.
         const cached = messagesCache.get(msgData.chatId) || [];
         cached.push(msgData);
+        if (cached.length > MAX_CACHED_MESSAGES_PER_CHAT) {
+            cached.splice(0, cached.length - MAX_CACHED_MESSAGES_PER_CHAT);
+        }
         messagesCache.set(msgData.chatId, cached);
+        persistMessagesCache();
 
         // Если это подтверждение НАШЕГО же оптимистично отправленного
         // сообщения — не дублируем, а просто "подтверждаем" уже нарисованное.
